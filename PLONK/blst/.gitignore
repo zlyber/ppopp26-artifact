@@ -1,0 +1,15 @@
+# Ignore the build directory
+build/
+
+# Ignore all .o and .a files
+*.o
+*.a
+
+# Ignore temporary files that may be created by the IDE
+*~
+*.swp
+*.tmp
+
+# Ignore OS-generated files (e.g. Mac or Windows)
+.DS_Store
+Thumbs.db
