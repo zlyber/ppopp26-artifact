@@ -1,12 +1,12 @@
-#include "fr.hpp"
 #pragma once
+#include "fr.hpp"
 
 using namespace caffe;
 
 SyncedMemory& COEFF_A(){
-    SyncedMemory res(Limbs * sizeof(uint64_t));
+    SyncedMemory res(fr::Limbs * sizeof(uint64_t));
     void* res_ = res.mutable_gpu_data();
-    uint64_t coeff_a[Limbs] = 
+    uint64_t coeff_a[fr::Limbs] = 
         {
             18446744060824649731UL,
             18102478225614246908UL,
@@ -19,9 +19,9 @@ SyncedMemory& COEFF_A(){
 
 
 SyncedMemory& COEFF_D(){
-    SyncedMemory res(Limbs * sizeof(uint64_t));
+    SyncedMemory res(fr::Limbs * sizeof(uint64_t));
     void* res_ = res.mutable_gpu_data();
-    uint64_t coeff_d[Limbs] = 
+    uint64_t coeff_d[fr::Limbs] = 
         {
             3049539848285517488UL,
             18189135023605205683UL,

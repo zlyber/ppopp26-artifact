@@ -1,13 +1,13 @@
-#include <iostream>
-#include <vector>
-#include <array>
-#include <random>
-#include <chrono>
-#include <cuda_runtime.h>
-#include "PLONK/src/bls12_381/fr.hpp"
-#include "PLONK/src/bls12_381/fq.hpp"
-#include "PLONK/utils/function.cuh"
-#include "PLONK/src/structure.cuh"
+#include "PLONK/src/arithmetic.cuh"
+
+
+SyncedMemory& convert_to_bigints(SyncedMemory& p){
+    return to_base(p);
+}
+
+SyncedMemory& skip_leading_zeros_and_convert_to_bigints(SyncedMemory& p){
+    return convert_to_bigints(p);
+}
 
 SyncedMemory& poly_add_poly(SyncedMemory& self, SyncedMemory& other) {
     if (self.size() == 0) {
@@ -43,15 +43,49 @@ SyncedMemory& poly_mul_const(SyncedMemory& poly, SyncedMemory& elem) {
     }
 }
 
-SyncedMemory& rand_poly(int d) {
+SyncedMemory& poly_add_poly_mul_const(SyncedMemory& self, SyncedMemory& f, SyncedMemory& other) {
+    if (self.size() == 0 && other.size() == 0){
+        SyncedMemory res(0);
+        return res;
+    }
+
+    else if (self.size() == 0){
+        void* other_ = other.mutable_gpu_data();
+        return mul_mod_scalar(other, f);
+    }
+    
+    else if (other.size() == 0){
+        void* self_ = self.mutable_gpu_data();
+        return self;
+    }
+ 
+    else if (self.size() > other.size()){
+        void* self_ = self.mutable_gpu_data();
+        void* other_ = other.mutable_gpu_data();
+        SyncedMemory& temp = mul_mod_scalar(other, f);
+        add_mod_(self, temp);
+        return self;
+    }
+
+    else {
+        void* self_ = self.mutable_gpu_data();
+        void* other_ = other.mutable_gpu_data();
+        SyncedMemory& mid = pad_poly(self, other.size()/(fr::Limbs*sizeof(uint64_t)));
+        SyncedMemory& temp = mul_mod_scalar(other, f);
+        SyncedMemory& res = add_mod(temp, self);
+        return res;
+    }
+}
+    
+
+void rand_poly(SyncedMemory& poly) {
     std::mt19937_64 gen(42);
     std::uniform_int_distribution<uint64_t> dis(0, UINT64_MAX);
     uint64_t random = dis(gen);
     SyncedMemory& rand_tensor = fr::make_tensor(random);
-    SyncedMemory rand_poly(fr::Limbs * sizeof(uint64_t) * (d+1));
     void* tensor = rand_tensor.mutable_cpu_data();
-    void* poly = rand_poly.mutable_cpu_data();
-    memcpy(poly,tensor,rand_tensor.size());
+    void* poly_ = poly.mutable_cpu_data();
+    memcpy(poly_, tensor, rand_tensor.size());
 }
 
 
