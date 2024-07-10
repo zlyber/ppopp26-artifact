@@ -7,6 +7,7 @@
 
 int main(){
     uint64_t host_data[10] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+    std::vector<uint64_t> vec_data(std::begin(host_data), std::end(host_data));
     uint64_t host_data2[5] = {11, 11, 11, 11,11};
 
     caffe::SyncedMemory mem(15 * sizeof(uint64_t));
@@ -22,12 +23,14 @@ int main(){
     // std::cout<<static_cast<uint64_t*>(gpu_data)[0]<<"\n";
     int a = mem.size();
     std::cout<< a<<"\n";
-    // for(int i = 0;i < 10; i++){
-    //    static_cast<uint64_t*>(gpu_data)[i]=host_data[i];
-    // 
-    for(int i = 0;i < 15; i++){
-       std::cout<<static_cast<uint64_t*>(cpu_data2)[i]<<" ";
+    for(int i = 0;i < 10; i++){
+       std::cout<<static_cast<uint64_t*>(gpu_data)[i]<<" ";
     }
+    uint64_t aaa=222;
+    for(int i = 0;i < 15; i++){
+       aaa=static_cast<uint64_t*>(cpu_data)[i];
+    }
+    std::cout<<aaa;
     printf("\n");
     return 0;
 }
