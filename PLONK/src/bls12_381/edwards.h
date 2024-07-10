@@ -1,5 +1,5 @@
 #pragma once
-#include "fr.hpp"
+#include "PLONK/src/bls12_381/fr.hpp"
 
 using namespace caffe;
 

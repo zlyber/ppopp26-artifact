@@ -72,7 +72,7 @@ void keccak_p(uint64_t* state, int round_count) {
 }
 
 
-Strobe128 Strobe128::new_instance(const char* protocol_label) {
+Strobe128 Strobe128::new_instance(char* protocol_label) {
     Strobe128 strobe;
     memset(strobe.state, 0, 200);
     strobe.state[0] = 1;

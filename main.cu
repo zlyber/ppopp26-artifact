@@ -32,5 +32,6 @@ int main(){
     }
     std::cout<<aaa;
     printf("\n");
+    printf("%d",sizeof(caffe::SyncedMemory*));
     return 0;
 }

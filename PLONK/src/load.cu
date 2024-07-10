@@ -1,6 +1,5 @@
 #include "PLONK/src/structure.cuh"
 #include "PLONK/src/bls12_381/fr.hpp"
-#include "PLONK/src/bls12_381/fq.hpp"
 
 ProverKey::ProverKey(
         SyncedMemory& q_m_coeffs, SyncedMemory& q_m_evals,

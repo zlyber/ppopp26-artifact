@@ -2,7 +2,7 @@
 #include <iostream>
 #include <vector>
 #include "caffe/syncedmem.hpp"
-#include "bls12_381/fq.hpp"
+#include "PLONK/src/bls12_381/fq.hpp"
 #include "PLONK/utils/function.cuh"
 
 constexpr int COEFF_A = 0;
@@ -36,7 +36,12 @@ class BTreeMap{
     public:
     SyncedMemory& item;
     uint64_t pos;
-    BTreeMap(SyncedMemory& item_, uint64_t pos_):item(item_),pos(pos_){}
+    BTreeMap(SyncedMemory& item_, uint64_t pos_) : item(item_), pos(pos_) {}
+
+    static BTreeMap& new_instance(SyncedMemory& item_, uint64_t pos_){
+        BTreeMap newmap = BTreeMap(item_,pos_);
+        return newmap;
+    }
 };
 
 
@@ -86,26 +91,11 @@ typedef struct {
     uint64_t* powers_of_gamma_g;
 }CommitKeyC;
 
-uint64_t next_power_of_2(uint64_t x) {
-    if (x == 0) return 1;
-    x--;
-    x |= x >> 1;
-    x |= x >> 2;
-    x |= x >> 4;
-    x |= x >> 8;
-    x |= x >> 16;
-    x |= x >> 32;
-    x++;
-    return x;
-}
+uint64_t next_power_of_2(uint64_t x);
 
-uint64_t total_size(CircuitC circuit){
-    return std::max(circuit.n, circuit.lookup_len);
-}
+uint64_t total_size(CircuitC circuit);
 
-uint64_t circuit_bound(CircuitC circuit){
-    return next_power_of_2(total_size(circuit));
-}
+uint64_t circuit_bound(CircuitC circuit);
 
 
 typedef struct {

@@ -1,7 +1,7 @@
+#pragma once
 #include <cstdint>
 #include <cstring>
 #include "PLONK/src/transcript/strobe.h"
-#include "PLONK/src/bls12_381/fr.hpp"
 #include "PLONK/src/serialize.cuh"
 
 
@@ -24,7 +24,7 @@ public:
 
     void append_pi(char* label, SyncedMemory& item, size_t pos) {
         uint8_t* buf = nullptr;
-        serialize(buf, BTreeMap(item,pos));
+        serialize(buf, BTreeMap::new_instance(item,pos));
         append_message(label, buf);
         free(buf);
     }

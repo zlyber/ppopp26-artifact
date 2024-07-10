@@ -6,8 +6,6 @@
 #include <chrono>
 #include <cuda_runtime.h>
 #include "PLONK/src/bls12_381/fr.hpp"
-#include "PLONK/src/bls12_381/fq.hpp"
-#include "PLONK/utils/function.cuh"
 #include "PLONK/src/structure.cuh"
 
 SyncedMemory& convert_to_bigints(SyncedMemory& p);

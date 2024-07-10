@@ -12,7 +12,7 @@ bool IsBTreeMap(...)  // match non-pointer
 
 // Serialize function
 template<typename T>
-void serialize(uint8_t* buffer, T item, int flag) {
+void serialize(uint8_t* buffer, T& item, int flag) {
     if (sizeof(item) == 40) {
         assert(flag <= 8 && "not enough space");
         SyncedMemory& item_base = to_base(item);
@@ -36,8 +36,7 @@ void serialize(uint8_t* buffer, T item, int flag) {
         else{
             if (AffinePointG1::is_zero(item)) {
                 flag = SWFlags::infinity().flag;
-                SyncedMemory& one = fq::zero();
-                serialize(buffer, one, flag);
+                serialize(buffer, fq::zero(), flag);
             } else {
                 SyncedMemory& a = to_base(item.y);
                 SyncedMemory& b = to_base(neg_mod(item.y));

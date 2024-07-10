@@ -67,7 +67,7 @@ public:
     int pos_begin;
     int cur_flags;
 
-    static Strobe128 new_instance(const char* protocol_label);
+    static Strobe128 new_instance(char* protocol_label);
 
     void run_f();
 

@@ -23,13 +23,14 @@ include_directories(
 
 file(GLOB_RECURSE plonk_utils_cpp "PLONK/utils/*.cpp")
 file(GLOB_RECURSE plonk_src_cu "PLONK/src/*.cu")
+file(GLOB_RECURSE plonk_src_cpp "PLONK/src/*.cpp")
 file(GLOB_RECURSE plonk_utils_cuda "PLONK/utils/*.cu")
 file(GLOB_RECURSE caffe_cpp "caffe/*.cpp")
 file(GLOB_RECURSE caffe_utils_cpp "caffe/utils/*.cpp")
 file(GLOB main "main.cu")
 
 
-set(CPU_SRCS  ${plonk_utils_cpp} ${caffe_cpp} ${caffe_utils_cpp} )
+set(CPU_SRCS  ${plonk_utils_cpp} ${caffe_cpp} ${caffe_utils_cpp} ${plonk_src_cpp})
 set(CUDA_SRCS ${plonk_src_cu} ${plonk_utils_cuda} ${main})
 
 

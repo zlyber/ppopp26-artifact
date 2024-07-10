@@ -5,11 +5,8 @@
 #include <random>
 #include <chrono>
 #include <cuda_runtime.h>
-#include "PLONK/src/bls12_381/fr.hpp"
-#include "PLONK/src/bls12_381/fq.hpp"
-#include "PLONK/utils/function.cuh"
 #include "PLONK/src/domain.cuh"
-#include "PLONK/src/serialize.cuh"
+#include "PLONK/src/transcript/transcript.h"
 
 ProofC gen_proof(ProverKeyC pkc, CircuitC csc, CommitKeyC ckc){
     uint64_t size = circuit_bound(csc);
