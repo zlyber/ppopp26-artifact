@@ -71,15 +71,15 @@ public:
 
     void run_f();
 
-    void absorb(const uint8_t* data, size_t data_len);
+    void absorb(uint8_t* data, size_t data_len);
 
     void squeeze(uint8_t* data, size_t data_len);
 
     void begin_op(int flags, bool more);
 
-    void meta_ad(const char* data, bool more);
+    void meta_ad(char* data, bool more);
 
-    void ad(const char* data, bool more);
+    void ad(char* data, bool more);
 
     void prf(uint8_t* data, size_t data_len, bool more);
 };

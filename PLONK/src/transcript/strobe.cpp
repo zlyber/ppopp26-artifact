@@ -110,7 +110,7 @@ void Strobe128::run_f() {
     pos_begin = 0;
 }
 
-void Strobe128::absorb(const uint8_t* data, size_t data_len) {
+void Strobe128::absorb(uint8_t* data, size_t data_len) {
     for (size_t i = 0; i < data_len; ++i) {
         state[pos] ^= data[i];
         pos += 1;
@@ -153,14 +153,14 @@ void Strobe128::begin_op(int flags, bool more) {
     }
 }
 
-void Strobe128::meta_ad(const char* data, bool more) {
+void Strobe128::meta_ad(char* data, bool more) {
     begin_op(FLAG_M | FLAG_A, more);
-    absorb(reinterpret_cast<const uint8_t*>(data), strlen(data));
+    absorb(reinterpret_cast<uint8_t*>(data), strlen(data));
 }
 
-void Strobe128::ad(const char* data, bool more) {
+void Strobe128::ad(char* data, bool more) {
     begin_op(FLAG_A, more);
-    absorb(reinterpret_cast<const uint8_t*>(data), strlen(data));
+    absorb(reinterpret_cast<uint8_t*>(data), strlen(data));
 }
 
 void Strobe128::prf(uint8_t* data, size_t data_len, bool more) {
