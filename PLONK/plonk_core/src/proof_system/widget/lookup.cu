@@ -83,7 +83,6 @@ SyncedMemory&  _compute_quotient_i(
 
     SyncedMemory&  z2_i = coset_ntt.forward(z2_poly);
     mid = mul_mod_scalar(z2_i, one_plus_delta);
-    
     mid = mul_mod(mid, b_0);
     mid = mul_mod(mid, b_1);
     SyncedMemory&  b = mul_mod_scalar(mid, lookup_sep_sq);
