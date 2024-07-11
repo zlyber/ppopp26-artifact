@@ -31,15 +31,16 @@ SyncedMemory& _delta_xor_and(
     SyncedMemory& a_plus_b = add_mod(a, b);
     SyncedMemory& f_1_1 = mul_mod_scalar(w, four);
     SyncedMemory& f_1_2 = mul_mod_scalar(a_plus_b, eighteen);
-    SyncedMemory& f_1 = sub_mod(f_1_1, f_1_2);
-    f_1 = add_mod_scalar(f_1, eighty_one);
-    f_1 = mul_mod(f_1, w);
+    SyncedMemory& f_1_temp_1 = sub_mod(f_1_1, f_1_2);
+    SyncedMemory& f_1_temp_2 = add_mod_scalar(f_1_temp_1, eighty_one);
+    SyncedMemory& f_1 = mul_mod(f_1_temp_2, w);
+
 
     
     SyncedMemory& f_2_1_1 = mul_mod(a, a);
     SyncedMemory& f_2_1_2 = mul_mod(b, b);
-    SyncedMemory& f_2 = add_mod(f_2_1_1, f_2_1_2);
-    f_2 = mul_mod_scalar(f_2, eighteen);
+    SyncedMemory& f_2_temp = add_mod(f_2_1_1, f_2_1_2);
+    SyncedMemory& f_2 = mul_mod_scalar(f_2_temp, eighteen);
 
     
     SyncedMemory& f = add_mod(f_1, f_2);

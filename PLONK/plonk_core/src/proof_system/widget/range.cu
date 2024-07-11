@@ -74,7 +74,7 @@ SyncedMemory& quotient_term(SyncedMemory& selector, SyncedMemory& separation_cha
     SyncedMemory& b_2 = mul_mod_scalar(mid, kappa);
 
     SyncedMemory& mid1 = add_mod(b_1, b_2);
-    b_1.reset(); b_2.reset(); 
+    // b_1.reset(); b_2.reset(); 
 
   
     mid = mul_mod_scalar(wit_vals.b_val, four);
@@ -84,7 +84,7 @@ SyncedMemory& quotient_term(SyncedMemory& selector, SyncedMemory& separation_cha
     SyncedMemory& b_3 = mul_mod_scalar(mid, kappa_sq);
 
     mid1 = add_mod(mid1, b_3);
-    b_3.reset(); 
+    // b_3.reset(); 
 
 
     mid = mul_mod_scalar(wit_vals.a_val, four);
@@ -93,7 +93,7 @@ SyncedMemory& quotient_term(SyncedMemory& selector, SyncedMemory& separation_cha
     SyncedMemory& b_4 = mul_mod_scalar(mid, kappa_cu.to("cuda"));
 
     mid = add_mod(mid1, b_4);
-    b_4.reset(); 
+    // b_4.reset(); 
     
     SyncedMemory& temp = mul_mod_scalar(mid, separation_challenge.to("cuda"));
 
@@ -103,9 +103,9 @@ SyncedMemory& quotient_term(SyncedMemory& selector, SyncedMemory& separation_cha
 
 SyncedMemory& linearisation_term(SyncedMemory& selector_poly, SyncedMemory& separation_challenge, const WitnessValues& wit_vals, const CustomValues& custom_vals) {
     SyncedMemory& temp = _constraints(separation_challenge, wit_vals, custom_vals);
-    SyncedMemory& res;
-    if (selector_poly.size(0) == 0) {
-        res = selector_poly.clone();
+    SyncedMemory res(selector_poly.size());
+    if (selector_poly.size()/(8*4) == 0) {
+        res = selector_poly;
     } else {
         res = mul_mod_scalar(selector_poly, temp);
     }

@@ -11,7 +11,9 @@
 #include "PLONK/src/domain.cuh"
 #include "PLONK/src/domain.cu"
 #include "PLONK/plonk_core/src/constaraint_system/hash.cu"
-#include "/PLONK/src/arithmetic.cu"
+#include "PLONK/src/arithmetic.cu"
+#include "PLONK/plonk_core/src/proof_system/widget/mod.cu"
+
 struct Arith {
     SyncedMemory& q_m;
     SyncedMemory& q_l;
@@ -33,31 +35,31 @@ struct Arith {
     SyncedMemory& out = mul_mod(wit_vals.c_val, arithmetics_evals.q_o);
     SyncedMemory& fourth = mul_mod(wit_vals.d_val, arithmetics_evals.q_4);
 
-    SyncedMemory& mid = add_mod(mult, left);
+    SyncedMemory& mid_temp_1 = add_mod(mult, left);
     // delete left;
-    mid = add_mod(mid, right);
+    SyncedMemory& mid_temp_2 = add_mod(mid_temp_1, right);
     // delete right;
-    mid = add_mod(mid, out);
+    SyncedMemory& mid_temp_3 = add_mod(mid_temp_2, out);
     // delete out;
-    mid = add_mod(mid, fourth);
+    SyncedMemory& mid_temp_4 = add_mod(mid_temp_3, fourth);
     // delete fourth;
 
-    SyncedMemory& a_high = exp_mod(wit_vals.a_val, SBOX_ALPHA);
-    a_high = mul_mod(a_high, arithmetics_evals.q_hl);
-    mid = add_mod(mid, a_high);
+    SyncedMemory& a_high_temp = exp_mod(wit_vals.a_val, SBOX_ALPHA);
+    SyncedMemory& a_high = mul_mod(a_high_temp, arithmetics_evals.q_hl);
+    SyncedMemory& mid_temp_5 = add_mod(mid_temp_4, a_high);
     // delete a_high;
 
-    SyncedMemory& b_high = exp_mod(wit_vals.b_val, SBOX_ALPHA);
-    b_high = mul_mod(b_high, arithmetics_evals.q_hr);
-    mid = add_mod(mid, b_high);
+    SyncedMemory& b_high_temp = exp_mod(wit_vals.b_val, SBOX_ALPHA);
+    SyncedMemory& b_high = mul_mod(b_high_temp, arithmetics_evals.q_hr);
+    SyncedMemory& mid_temp_6 = add_mod(mid_temp_5, b_high);
     // delete b_high;
 
-    SyncedMemory& f_high = exp_mod(wit_vals.d_val, SBOX_ALPHA);
-    f_high = mul_mod(f_high, arithmetics_evals.q_h4);
-    mid = add_mod(mid, f_high);
+    SyncedMemory& f_high_temp = exp_mod(wit_vals.d_val, SBOX_ALPHA);
+    SyncedMemory& f_high = mul_mod(f_high_temp, arithmetics_evals.q_h4);
+    SyncedMemory& mid_temp_7 = add_mod(mid_temp_6, f_high);
     // delete f_high;
 
-    mid = add_mod(mid, arithmetics_evals.q_c);
+    SyncedMemory& mid = add_mod(mid_temp_7, arithmetics_evals.q_c);
     SyncedMemory& arith_val = mul_mod(mid, arithmetics_evals.q_arith);
     return arith_val;
 }

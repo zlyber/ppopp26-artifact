@@ -6,6 +6,7 @@
 #include "PLONK/plonk_core/src/proof_system/widget/mod.cu"
 #include "PLONK/src/arithmetic.cu"
 #include "PLONK/src/bls12_381/edwards.h"
+#include "PLONK/plonk_core/src/proof_system/widget/custom_class.cu"
 class CAValues {
 public:
     SyncedMemory& a_next_val;
@@ -16,10 +17,10 @@ public:
     CAValues(SyncedMemory& a, SyncedMemory& b, SyncedMemory& d)
         : a_next_val(a), b_next_val(b), d_next_val(d) {}
 
-    static CAValues from_evaluations(std::map<std::string, SyncedMemory&> custom_evals) {
-        SyncedMemory& a_next_val = custom_evals["a_next_eval"];
-        SyncedMemory& b_next_val = custom_evals["b_next_eval"];
-        SyncedMemory& d_next_val = custom_evals["d_next_eval"];
+    static CAValues from_evaluations(Custom_class& custom_evals) {
+        SyncedMemory& a_next_val = custom_evals.a_next_eval;
+        SyncedMemory& b_next_val = custom_evals.b_next_eval;
+        SyncedMemory& d_next_val = custom_evals.d_next_eval;
         
         return CAValues{a_next_val, b_next_val, d_next_val};
     }
@@ -27,14 +28,14 @@ public:
 
 class CAGate {
 public:
-    static SyncedMemory& constraints(SyncedMemory& separation_challenge, const WitnessValues& wit_vals, const CAValues& custom_vals) {
+    static SyncedMemory& constraints(SyncedMemory& separation_challenge, const WitnessValues& wit_vals, const Custom_class& custom_vals) {
         SyncedMemory& x_1 = wit_vals.a_val;
-        SyncedMemory& x_3 = custom_vals.a_next_val;
+        SyncedMemory& x_3 = custom_vals.a_next_eval;
         SyncedMemory& y_1 = wit_vals.b_val;
-        SyncedMemory& y_3 = custom_vals.b_next_val;
+        SyncedMemory& y_3 = custom_vals.b_next_eval;
         SyncedMemory& x_2 = wit_vals.c_val;
         SyncedMemory& y_2 = wit_vals.d_val;
-        SyncedMemory& x1_y2 = custom_vals.d_next_val;
+        SyncedMemory& x1_y2 = custom_vals.d_next_eval;
         SyncedMemory& kappa = mul_mod(separation_challenge, separation_challenge);
         SyncedMemory& x1y2 = mul_mod(x_1, y_2);
         SyncedMemory& xy_consistency =sub_mod(x1y2, x1_y2);
@@ -72,16 +73,16 @@ public:
         SyncedMemory& y1_x2 = mul_mod(custom_vals.a_next_val, wit_vals.c_val);
         SyncedMemory& coeff_d=COEFF_D();
         void* coeff_d_gpu_data = coeff_d.mutable_gpu_data();
-        SyncedMemory& mid = mul_mod_scalar(custom_vals.a_next_val, coeff_d);
-        mid = mul_mod(mid, custom_vals.d_next_val);
-        mid = mul_mod(mid, y1_x2);
-        SyncedMemory& x3_rhs = add_mod(custom_vals.a_next_val, mid);
+        SyncedMemory& mid_temp_1 = mul_mod_scalar(custom_vals.a_next_val, coeff_d);
+        SyncedMemory& mid_temp_2 = mul_mod(mid_temp_1, custom_vals.d_next_val);
+        SyncedMemory& mid_temp_3 = mul_mod(mid_temp_2, y1_x2);
+        SyncedMemory& x3_rhs = add_mod(custom_vals.a_next_val, mid_temp_3);
         SyncedMemory& x3_lhs = add_mod(custom_vals.d_next_val, y1_x2);
         SyncedMemory& x3_l_sub_r = sub_mod(x3_lhs, x3_rhs);
         // delete x3_lhs; delete x3_rhs;
-        mid = mul_mod_scalar(custom_vals.b_next_val, coeff_d);
-        mid = mul_mod(mid, custom_vals.d_next_val);
-        mid = mul_mod(mid, y1_x2);
+        SyncedMemory& mid_temp_4 = mul_mod_scalar(custom_vals.b_next_val, coeff_d);
+        SyncedMemory& mid_temp_5 = mul_mod(mid_temp_4, custom_vals.d_next_val);
+        SyncedMemory& mid = mul_mod(mid_temp_5, y1_x2);
         // delete y1_x2;
         void* kappa_gpu_data = kappa.mutable_gpu_data();
         SyncedMemory& x3_consistency = mul_mod_scalar(x3_l_sub_r, kappa);
@@ -89,8 +90,8 @@ public:
 
         SyncedMemory& coeff_a=COEFF_A();
         void* coeff_a_gpu_data = coeff_a.mutable_gpu_data();
-        SyncedMemory& x1_x2 = mul_mod(wit_vals.a_val, wit_vals.c_val);
-        x1_x2 = mul_mod_scalar(x1_x2, coeff_a);
+        SyncedMemory& x1_x2_temp = mul_mod(wit_vals.a_val, wit_vals.c_val);
+        SyncedMemory& x1_x2 = mul_mod_scalar(x1_x2_temp, coeff_a);
         SyncedMemory& y1_y2 = mul_mod(custom_vals.a_next_val, wit_vals.d_val);
         SyncedMemory& y3_lhs = sub_mod(y1_y2, x1_x2);
         // delete y1_y2; delete x1_x2;
@@ -105,15 +106,15 @@ public:
         SyncedMemory& x1y2 = mul_mod(wit_vals.a_val, wit_vals.d_val);
         SyncedMemory& xy_consistency = sub_mod(x1y2, custom_vals.d_next_val);
 
-        SyncedMemory& res = add_mod(xy_consistency, x3_consistency);
-        res = add_mod(res, y3_consistency);
+        SyncedMemory& res_temp_1 = add_mod(xy_consistency, x3_consistency);
+        SyncedMemory& res_temp_2 = add_mod(res_temp_1, y3_consistency);
         void* separation_challenge_gpu_data=separation_challenge.mutable_gpu_data();
-        res = mul_mod_scalar(res, separation_challenge);
-        res = mul_mod(selector, res);
+        SyncedMemory& res_temp_3 = mul_mod_scalar(res_temp_2, separation_challenge);
+        SyncedMemory& res = mul_mod(selector, res_temp_3);
         return res;
     }
 
-    static SyncedMemory& linearisation_term(SyncedMemory& selector_poly,  SyncedMemory& separation_challenge,  WitnessValues& wit_vals,  CAValues& custom_vals) {
+    static SyncedMemory& linearisation_term(SyncedMemory& selector_poly,  SyncedMemory& separation_challenge,  WitnessValues& wit_vals,  Custom_class& custom_vals) {
         SyncedMemory& temp = CAGate::constraints(separation_challenge, wit_vals, custom_vals);
         SyncedMemory& res = poly_mul_const(selector_poly, temp);
         return res;

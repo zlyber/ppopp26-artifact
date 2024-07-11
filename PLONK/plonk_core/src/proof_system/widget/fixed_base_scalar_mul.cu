@@ -3,6 +3,7 @@
 #include "PLONK/plonk_core/src/proof_system/widget/mod.cu"
 #include "PLONK/src/bls12_381/edwards.h"
 #include "PLONK/src/arithmetic.cu"
+#include "PLONK/plonk_core/src/proof_system/widget/custom_class.cu"
 class FBSMValues {
 public:
     
@@ -16,13 +17,13 @@ public:
     FBSMValues(SyncedMemory& a_next_val, SyncedMemory& b_next_val, SyncedMemory& d_next_val, SyncedMemory& q_l_val, SyncedMemory& q_r_val, SyncedMemory& q_c_val) :
         a_next_val(a_next_val), b_next_val(b_next_val), d_next_val(d_next_val), q_l_val(q_l_val), q_r_val(q_r_val), q_c_val(q_c_val) {}
 
-    static FBSMValues from_evaluations(const std::map<std::string, SyncedMemory&>& custom_evals) {
-        SyncedMemory& a_next_val = custom_evals.at("a_next_eval");
-        SyncedMemory& b_next_val = custom_evals.at("b_next_eval");
-        SyncedMemory& d_next_val = custom_evals.at("d_next_eval");
-        SyncedMemory& q_l_val = custom_evals.at("q_l_eval");
-        SyncedMemory& q_r_val = custom_evals.at("q_r_eval");
-        SyncedMemory& q_c_val = custom_evals.at("q_c_eval");
+    static FBSMValues from_evaluations(const Custom_class& custom_evals) {
+        SyncedMemory& a_next_val = custom_evals.a_next_eval;
+        SyncedMemory& b_next_val = custom_evals.b_next_eval;
+        SyncedMemory& d_next_val = custom_evals.d_next_eval;
+        SyncedMemory& q_l_val = custom_evals.q_l_eval;
+        SyncedMemory& q_r_val = custom_evals.q_r_eval;
+        SyncedMemory& q_c_val = custom_evals.q_c_eval;
 
         return FBSMValues(a_next_val, b_next_val, d_next_val, q_l_val, q_r_val, q_c_val);
     }
@@ -64,8 +65,8 @@ public:
         
         // custom_vals.q_c_val=torch::tensor(from_gmpy_list_1(custom_vals.q_c_val),dtype=torch::BLS12_381_Fr_G1_Mont)
         SyncedMemory& bit_times_q_c_val = mul_mod(bit, custom_vals.q_c_val);
-        SyncedMemory& xy_consistency = sub_mod(bit_times_q_c_val, xy_alpha);
-        xy_consistency = mul_mod(xy_consistency, kappa);
+        SyncedMemory& xy_consistency_temp = sub_mod(bit_times_q_c_val, xy_alpha);
+        SyncedMemory& xy_consistency = mul_mod(xy_consistency_temp, kappa);
 
         
         SyncedMemory& x_3 = acc_x_next;
@@ -81,8 +82,8 @@ public:
         SyncedMemory& x_3_times_acc_y = mul_mod(x_alpha, acc_y);
         SyncedMemory& y_alpha_times_acc_x = mul_mod(y_alpha, acc_x);
         SyncedMemory& rhs_x = add_mod(x_3_times_acc_y, y_alpha_times_acc_x);
-        SyncedMemory& x_acc_consistency = sub_mod(lhs_x, rhs_x);
-        x_acc_consistency = mul_mod(x_acc_consistency, kappa_sq);
+        SyncedMemory& x_acc_consistency_temp = sub_mod(lhs_x, rhs_x);
+        SyncedMemory& x_acc_consistency = mul_mod(x_acc_consistency_temp, kappa_sq);
 
         
         SyncedMemory& y_3 = acc_y_next;
@@ -99,8 +100,8 @@ public:
         SyncedMemory& coeff_A_times_x_alpha = mul_mod(COEFF_A(), x_alpha);
         SyncedMemory& coeff_A_times_x_alpha_times_acc_x =mul_mod(coeff_A_times_x_alpha, acc_x);
         SyncedMemory& rhs_y = sub_mod(y_alpha_times_acc_y, coeff_A_times_x_alpha_times_acc_x);
-        SyncedMemory& y_acc_consistency = sub_mod(lhs_y, rhs_y);
-        y_acc_consistency = mul_mod(y_acc_consistency, kappa_cu);
+        SyncedMemory& y_acc_consistency_temp = sub_mod(lhs_y, rhs_y);
+        SyncedMemory& y_acc_consistency = mul_mod(y_acc_consistency_temp, kappa_cu);
 
         SyncedMemory& mid1 = add_mod(bit_consistency, x_acc_consistency);
         SyncedMemory& mid2 = add_mod(mid1, y_acc_consistency);
@@ -120,71 +121,71 @@ public:
     void* one_gpu_data =one.mutable_gpu_data();
 
     SyncedMemory& bit = extract_bit(wit_vals.d_val, custom_vals.d_next_val);
-    SyncedMemory& y_alpha = sub_mod_scalar(custom_vals.q_r_val, one);
+    SyncedMemory& y_alpha_temp_1 = sub_mod_scalar(custom_vals.q_r_val, one);
     SyncedMemory& bit2 = mul_mod(bit, bit);
-    y_alpha = mul_mod(bit2, y_alpha);
+    SyncedMemory& y_alpha_temp_2 = mul_mod(bit2, y_alpha_temp_1);
     // bit2.reset();
-    y_alpha = add_mod_scalar(y_alpha, one);
+    SyncedMemory& y_alpha = add_mod_scalar(y_alpha_temp_2, one);
     SyncedMemory& x_alpha = mul_mod(custom_vals.q_l_val, bit);
 
-    SyncedMemory& mid = mul_mod(custom_vals.a_next_val, wit_vals.c_val);
-    mid = mul_mod(mid, wit_vals.a_val);
-    mid = mul_mod(mid, wit_vals.b_val);
+    SyncedMemory& mid_temp_1 = mul_mod(custom_vals.a_next_val, wit_vals.c_val);
+    SyncedMemory& mid_temp_2 = mul_mod(mid_temp_1, wit_vals.a_val);
+    SyncedMemory& mid_temp_3 = mul_mod(mid_temp_2, wit_vals.b_val);
     SyncedMemory& coeff_d=COEFF_D();
     void* coeff_d_gpu_data =coeff_d.mutable_gpu_data();
-    mid = mul_mod_scalar(mid, coeff_d);
-    SyncedMemory& lhs_x = add_mod(custom_vals.a_next_val, mid);
+    SyncedMemory& mid_temp_4 = mul_mod_scalar(mid_temp_3, coeff_d);
+    SyncedMemory& lhs_x = add_mod(custom_vals.a_next_val, mid_temp_4);
     // mid.reset();
 
-    SyncedMemory& rhs_x = mul_mod(x_alpha, wit_vals.b_val);
+    SyncedMemory& rhs_x_temp = mul_mod(x_alpha, wit_vals.b_val);
     SyncedMemory& y_alpha_times_acc_x = mul_mod(y_alpha, wit_vals.a_val);
-    rhs_x = add_mod(rhs_x, y_alpha_times_acc_x);
+    SyncedMemory& rhs_x = add_mod(rhs_x_temp, y_alpha_times_acc_x);
     SyncedMemory& rhs_y = mul_mod(y_alpha, wit_vals.b_val);
     // y_alpha.reset();
     // y_alpha_times_acc_x.reset();
 
-    SyncedMemory& x_acc_consistency = sub_mod(lhs_x, rhs_x);
+    SyncedMemory& x_acc_consistency_temp = sub_mod(lhs_x, rhs_x);
     // lhs_x.reset();
     // rhs_x.reset();
     void* kappa_sq_gpu_data=kappa_sq.mutable_gpu_data();
-    x_acc_consistency = mul_mod_scalar(x_acc_consistency, kappa_sq);
+    SyncedMemory& x_acc_consistency = mul_mod_scalar(x_acc_consistency_temp, kappa_sq);
     SyncedMemory& bit_consistency = check_bit_consistency(bit, one);
-    SyncedMemory& mid1 = add_mod(bit_consistency, x_acc_consistency);
-    SyncedMemory& xy_consistency = mul_mod(bit, custom_vals.q_c_val);
+    SyncedMemory& mid1_temp_1 = add_mod(bit_consistency, x_acc_consistency);
+    SyncedMemory& xy_consistency_temp_1 = mul_mod(bit, custom_vals.q_c_val);
     // x_acc_consistency.reset();
     // bit.reset();
     // bit_consistency.reset();
 
-    mid = mul_mod(custom_vals.b_next_val, wit_vals.c_val);
-    mid = mul_mod(mid, wit_vals.a_val);
-    mid = mul_mod(mid, wit_vals.b_val);
-    mid = mul_mod_scalar(mid, coeff_d);
+    SyncedMemory& mid2_temp_1 = mul_mod(custom_vals.b_next_val, wit_vals.c_val);
+    SyncedMemory& mid2_temp_2 = mul_mod(mid2_temp_1, wit_vals.a_val);
+    SyncedMemory& mid2_temp_3 = mul_mod(mid2_temp_2, wit_vals.b_val);
+    SyncedMemory& mid = mul_mod_scalar(mid2_temp_3, coeff_d);
     SyncedMemory& lhs_y = sub_mod(custom_vals.b_next_val, mid);
     SyncedMemory& coeff_a = COEFF_A();
     void* coeff_a_gpu_data = coeff_a.mutable_gpu_data();
-    mid = mul_mod_scalar(x_alpha, coeff_a);
+    SyncedMemory& mid3_temp_1 = mul_mod_scalar(x_alpha, coeff_a);
     // x_alpha.reset();
 
-    mid = mul_mod(mid, wit_vals.a_val);
-    SyncedMemory& rhs_y = sub_mod(rhs_y, mid);
+    SyncedMemory& mid3 = mul_mod(mid3_temp_1, wit_vals.a_val);
+    SyncedMemory& rhs_y = sub_mod(rhs_y, mid3);
     // mid.reset();
 
-    SyncedMemory& y_acc_consistency = sub_mod(lhs_y, rhs_y);
+    SyncedMemory& y_acc_consistency_temp = sub_mod(lhs_y, rhs_y);
     // lhs_y.reset();
     // rhs_y.reset();
     void* kappa_cu_gpu_data=kappa_cu.mutable_gpu_data();
     void* kappa_gpu_data=kappa.mutable_gpu_data();
-    y_acc_consistency = mul_mod_scalar(y_acc_consistency, kappa_cu);
-    xy_consistency = sub_mod(xy_consistency, wit_vals.c_val);
-    xy_consistency = mul_mod_scalar(xy_consistency, kappa);
-    mid1 = add_mod(mid1, y_acc_consistency);
-    SyncedMemory& res = add_mod(mid1, xy_consistency);
+    SyncedMemory& y_acc_consistency = mul_mod_scalar(y_acc_consistency_temp, kappa_cu);
+    SyncedMemory& xy_consistency_temp_2 = sub_mod(xy_consistency_temp_1, wit_vals.c_val);
+    SyncedMemory& xy_consistency = mul_mod_scalar(xy_consistency_temp_2, kappa);
+    SyncedMemory& mid1_temp_2 = add_mod(mid1_temp_1, y_acc_consistency);
+    SyncedMemory& res_temp_1 = add_mod(mid1_temp_2, xy_consistency);
     // mid1.reset();
     // y_acc_consistency.reset();
     // xy_consistency.reset();
     void* separation_challenge_gpu_data=separation_challenge.mutable_gpu_data();
-    res = mul_mod_scalar(res, separation_challenge);
-    res = mul_mod(selector, res);
+    SyncedMemory& res_temp_2 = mul_mod_scalar(res_temp_1, separation_challenge);
+    SyncedMemory& res = mul_mod(selector, res_temp_2);
     return res;
 }
 
@@ -197,17 +198,17 @@ public:
 };
 SyncedMemory& extract_bit(SyncedMemory&curr_acc, SyncedMemory& next_acc) {
     
-    SyncedMemory& res = sub_mod(next_acc, curr_acc);
-    res = sub_mod(res, curr_acc);
+    SyncedMemory& res_temp = sub_mod(next_acc, curr_acc);
+    SyncedMemory& res = sub_mod(res_temp, curr_acc);
     return res;
 }
 
 
 SyncedMemory& check_bit_consistency(SyncedMemory& bit, SyncedMemory& one) {
 
-    SyncedMemory& mid = sub_mod_scalar(bit, one);
-    SyncedMemory& res = mul_mod(mid, bit);
-    mid = add_mod_scalar(bit, one);
-    res = mul_mod(res, mid);
+    SyncedMemory& mid_temp = sub_mod_scalar(bit, one);
+    SyncedMemory& res_temp = mul_mod(mid_temp, bit);
+    SyncedMemory& mid = add_mod_scalar(bit, one);
+    SyncedMemory& res = mul_mod(res_temp, mid);
     return res;
 }
