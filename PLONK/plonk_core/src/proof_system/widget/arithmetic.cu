@@ -64,7 +64,7 @@ struct Arith {
     return arith_val;
 }
 
-// 计算给定评估点处线性化多项式的算术门贡献
+
  SyncedMemory& compute_linearisation_arithmetic(
      SyncedMemory& a_eval,
      SyncedMemory& b_eval,

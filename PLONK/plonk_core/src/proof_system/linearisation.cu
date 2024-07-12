@@ -12,6 +12,7 @@
 #include "PLONK/plonk_core/src/proof_system/widget/range.cu"
 #include "PLONK/plonk_core/src/proof_system/widget/logic.cu"
 #include "PLONK/plonk_core/src/proof_system/widget/fixed_base_scalar_mul.cu"
+#include "PLONK/plonk_core/src/proof_system/widget/arithmetic.cu"
 class WireEvaluations {
 public:
     SyncedMemory& a_eval;
@@ -284,7 +285,7 @@ std::tuple<SyncedMemory&, ProofEvaluations> compute_linearisation_poly(
     ProofEvaluations proof_evaluations = ProofEvaluations(
         wire_evals, perm_evals, lookup_evals, custom_evals
     );
-    return std::make_pair(linearisation_polynomial, proof_evaluations);
+    return std::make_tuple(linearisation_polynomial, proof_evaluations);
 }
 
 SyncedMemory& compute_gate_constraint_satisfiability(
@@ -317,7 +318,6 @@ SyncedMemory& compute_gate_constraint_satisfiability(
 
     
     void* range_separation_challenge_gpu_data=range_separation_challenge.mutable_gpu_data();
-    
     SyncedMemory& range = range_linearisation_term(
         pk.range_selector_coeffs,
         range_separation_challenge,
@@ -326,7 +326,6 @@ SyncedMemory& compute_gate_constraint_satisfiability(
     );
 
     void* logic_separation_challenge_gpu_data=logic_separation_challenge.mutable_gpu_data();
-    
     SyncedMemory& logic = logic_linearisation_term(
         pk.logic_selector_coeffs,
         logic_separation_challenge,
@@ -336,8 +335,6 @@ SyncedMemory& compute_gate_constraint_satisfiability(
 
 
     void*  fixed_base_separation_challenge_gpu_data=fixed_base_separation_challenge.mutable_gpu_data();
-    
-    
     SyncedMemory& fixed_base_scalar_mul = FBSMGate_linearisation_term(
         pk.fixed_group_add_selector_coeffs,
         fixed_base_separation_challenge,

@@ -101,7 +101,7 @@ SyncedMemory& quotient_term(SyncedMemory& selector, SyncedMemory& separation_cha
     return res;
 }
 
-SyncedMemory& range_linearisation_term(SyncedMemory& selector_poly, SyncedMemory& separation_challenge,  WitnessValues& wit_vals, Customclass& custom_vals) {
+SyncedMemory& range_linearisation_term(SyncedMemory& selector_poly, SyncedMemory& separation_challenge,  WitnessValues& wit_vals, Custom_class& custom_vals) {
     SyncedMemory& temp = range_constraints(separation_challenge, wit_vals, custom_vals);
     if (selector_poly.size()/(8*4) == 0) {
         SyncedMemory& res = selector_poly;

@@ -1,4 +1,3 @@
-#include <iostream>
 #include <cuda_runtime.h>
 #include "PLONK/plonk_core/src/permutation/constants.cu"
 #include "PLONK/utils/function.cuh"
@@ -8,6 +7,7 @@
 #include "PLONK/src/bls12_381/fq.hpp"
 #include "PLONK/src/domain.cuh"
 #include "PLONK/src/domain.cu"
+#include "PLONK/src/arithmetic.cu"
 // (a(x) + beta * X + gamma) (b(X) + beta * k1 * X + gamma) (c(X) + beta *
 // k2 * X + gamma)(d(X) + beta * k3 * X + gamma)z(X) * alpha
 SyncedMemory& compute_quotient_identity_range_check_i(
@@ -83,37 +83,36 @@ SyncedMemory& compute_quotient_copy_range_check_i(
     void* beta_gpu_data=beta.mutable_gpu_data();
     void* gamma_gpu_data=gamma.mutable_gpu_data();
 
-    SyncedMemory& mid1 = mul_mod_scalar(pk_left_sigma_evals, beta);
-    mid1 =  add_mod(w_l_i, mid1);
-    mid1 =  add_mod_scalar(mid1, gamma);
+    SyncedMemory& mid1_temp_1 = mul_mod_scalar(pk_left_sigma_evals, beta);
+    SyncedMemory& mid1_temp_2 =  add_mod(w_l_i, mid1_temp_1);
+    SyncedMemory& mid1 =  add_mod_scalar(mid1_temp_2, gamma);
 
-    SyncedMemory& mid2 =  mul_mod_scalar(pk_right_sigma_evals, beta);
-    mid2 =  add_mod(w_r_i, mid2);
-    mid2 =  add_mod_scalar(mid2, gamma);
+    SyncedMemory& mid2_temp_1 =  mul_mod_scalar(pk_right_sigma_evals, beta);
+    SyncedMemory& mid2_temp_2 =  add_mod(w_r_i, mid2_temp_1);
+    SyncedMemory& mid2 =  add_mod_scalar(mid2_temp_2, gamma);
 
-    SyncedMemory& res =  mul_mod(mid1, mid2);
+    SyncedMemory& res_temp_1 =  mul_mod(mid1, mid2);
     // delete mid1;
     // delete mid2;
 
-    SyncedMemory& mid3 =  mul_mod_scalar(pk_out_sigma_evals, beta);
-    mid3 =  add_mod(w_o_i, mid3);
-    mid3 =  add_mod_scalar(mid3, gamma);
-    res =  mul_mod(res, mid3);
+    SyncedMemory& mid3_temp_1 =  mul_mod_scalar(pk_out_sigma_evals, beta);
+    SyncedMemory& mid3_temp_2 =  add_mod(w_o_i, mid3_temp_1);
+    SyncedMemory& mid3 =  add_mod_scalar(mid3_temp_2, gamma);
+    SyncedMemory& res_temp_2 =  mul_mod(res_temp_1, mid3);
     // delete mid3;
 
-    SyncedMemory& mid4 =  mul_mod_scalar(pk_fourth_sigma_evals, beta);
-    mid4 =  add_mod(w_4_i, mid4);
-    mid4 =  add_mod_scalar(mid4, gamma);
+    SyncedMemory& mid4_temp_1 =  mul_mod_scalar(pk_fourth_sigma_evals, beta);
+    SyncedMemory& mid4_temp_2 =  add_mod(w_4_i, mid4_temp_1);
+    SyncedMemory& mid4 =  add_mod_scalar(mid4_temp_2, gamma);
 
-    res =  mul_mod(res, mid4);
-    delete mid4;
-    res =  mul_mod(res, z_i_next);
-    res =  mul_mod_scalar(res, alpha);
-
-    // 获取 modulus 并扩展到多项式形式
+    SyncedMemory& res_temp_3 =  mul_mod(res_temp_2, mid4);
+    // delete mid4;
+    SyncedMemory& res_temp_4 =  mul_mod(res_temp_3, z_i_next);
+    SyncedMemory& res =  mul_mod_scalar(res_temp_4, alpha);
+    
     void* fr_MODULUS_gpu_data=fr::MODULUS().mutable_gpu_data();
     SyncedMemory& extend_mod = repeat_to_poly(fr::MODULUS(), size);
-    res =  sub_mod(extend_mod, res);
+    SyncedMemory& res =  sub_mod(extend_mod, res);
 
     return res;
 }
@@ -122,8 +121,8 @@ SyncedMemory& compute_quotient_copy_range_check_i(
 //  L_1(X)[Z(X) - 1]
 SyncedMemory& compute_quotient_term_check_one_i(SyncedMemory& z_i, SyncedMemory& l1_alpha_sq) {
     SyncedMemory& one = fr::one();  
-    SyncedMemory& res = sub_mod_scalar(z_i, one);  
-    res = mul_mod(res, l1_alpha_sq);  
+    SyncedMemory& res_temp_1 = sub_mod_scalar(z_i, one);  
+    SyncedMemory& res = mul_mod(res_temp_1, l1_alpha_sq);  
     return res;  
 }
 
@@ -182,35 +181,35 @@ SyncedMemory& compute_lineariser_identity_range_check(
     SyncedMemory& beta_z = mul_mod(beta, z_challenge);
     
     // a_eval + beta * z_challenge + gamma
-    SyncedMemory& a_0 = add_mod(a_eval, beta_z);
-    a_0 = add_mod(a_0, gamma);
+    SyncedMemory& a_0_temp = add_mod(a_eval, beta_z);
+    SyncedMemory& a_0 = add_mod(a_0_temp, gamma);
 
     // b_eval + beta * K1 * z_challenge + gamma
     SyncedMemory&  k1 = K1();
     void* k1_data=k1.mutable_gpu_data();
 
     SyncedMemory& beta_z_k1 = mul_mod(k1, beta_z);
-    SyncedMemory& a_1 = add_mod(b_eval, beta_z_k1);
-    a_1 = add_mod(a_1, gamma);
+    SyncedMemory& a_1_temp = add_mod(b_eval, beta_z_k1);
+    SyncedMemory& a_1 = add_mod(a_1_temp, gamma);
 
     // c_eval + beta * K2 * z_challenge + gamma
     SyncedMemory&  k2 = K2();
     void* k2_data=k2.mutable_gpu_data();
     SyncedMemory& beta_z_k2 = mul_mod(k2, beta_z);
-    SyncedMemory& a_2 = add_mod(c_eval, beta_z_k2);
-    a_2 = add_mod(a_2, gamma);
+    SyncedMemory& a_2_temp = add_mod(c_eval, beta_z_k2);
+    SyncedMemory& a_2 = add_mod(a_2_temp, gamma);
 
     // d_eval + beta * K3 * z_challenge + gamma
     SyncedMemory&  k3 = K3();
     void* k3_data=k3.mutable_gpu_data();
     SyncedMemory& beta_z_k3 = mul_mod(k3, beta_z);
-    SyncedMemory& a_3 = add_mod(d_eval, beta_z_k3);
-    a_3 = add_mod(a_3, gamma);
+    SyncedMemory& a_3_temp = add_mod(d_eval, beta_z_k3);
+    SyncedMemory& a_3 = add_mod(a_3_temp, gamma);
 
-    SyncedMemory& a = mul_mod(a_0, a_1);
-    a = mul_mod(a, a_2);
-    a = mul_mod(a, a_3);
-    a = mul_mod(a, alpha);
+    SyncedMemory& a_temp_1 = mul_mod(a_0, a_1);
+    SyncedMemory& a_temp_2 = mul_mod(a_temp_1, a_2);
+    SyncedMemory& a_temp_3 = mul_mod(a_temp_2, a_3);
+    SyncedMemory& a = mul_mod(a_temp_3, alpha);
 
     SyncedMemory& res = poly_mul_const(z_poly, a);
     return res;
@@ -228,24 +227,24 @@ SyncedMemory& compute_lineariser_copy_range_check(
 ) {
     // a_eval + beta * sigma_1 + gamma
     SyncedMemory&beta_sigma_1 = mul_mod(beta, sigma_1_eval);
-    SyncedMemory&a_0 = add_mod(a_eval, beta_sigma_1);
-    a_0 = add_mod(a_0, gamma);
+    SyncedMemory& a_0_temp = add_mod(a_eval, beta_sigma_1);
+    SyncedMemory& a_0 = add_mod(a_0_temp, gamma);
 
     // b_eval + beta * sigma_2 + gamma
     SyncedMemory&beta_sigma_2 = mul_mod(beta, sigma_2_eval);
-    SyncedMemory&a_1 = add_mod(b_eval, beta_sigma_2);
-    a_1 = add_mod(a_1, gamma);
+    SyncedMemory&a_1_temp = add_mod(b_eval, beta_sigma_2);
+    SyncedMemory& a_1 = add_mod(a_1_temp, gamma);
 
     // c_eval + beta * sigma_3 + gamma
-    SyncedMemory&beta_sigma_3 = mul_mod(beta, sigma_3_eval);
-    SyncedMemory&a_2 =add_mod(c_eval, beta_sigma_3);
-    a_2 = add_mod(a_2, gamma);
+    SyncedMemory& beta_sigma_3 = mul_mod(beta, sigma_3_eval);
+    SyncedMemory& a_2_temp =add_mod(c_eval, beta_sigma_3);
+    SyncedMemory& a_2 = add_mod(a_2_temp, gamma);
 
-    SyncedMemory&beta_z_eval = mul_mod(beta, z_eval);
-    SyncedMemory&a = mul_mod(a_0, a_1);
-    a = mul_mod(a, a_2);
-    a = mul_mod(a, beta_z_eval);
-    a = mul_mod(a, alpha);
+    SyncedMemory& beta_z_eval = mul_mod(beta, z_eval);
+    SyncedMemory& a_temp_1 = mul_mod(a_0, a_1);
+    SyncedMemory& a_temp_2 = mul_mod(a_temp_1, a_2);
+    SyncedMemory& a_temp_3 = mul_mod(a_temp_2, beta_z_eval);
+    SyncedMemory& a = mul_mod(a_temp_3, alpha);
     SyncedMemory&neg_a = sub_mod(mod, a);
 
     SyncedMemory&res = poly_mul_const(fourth_sigma_poly, neg_a);
@@ -297,7 +296,7 @@ SyncedMemory& compute_lineariser_check_is_one(
 
         SyncedMemory& c = compute_quotient_term_check_one_i(z_i, l1_alpha_sq);
 
-        SyncedMemory& res = add_mod(a, b);
-        res = add_mod(res, c);
+        SyncedMemory& res_temp = add_mod(a, b);
+        SyncedMemory& res = add_mod(res_temp, c);
         return res;
 }

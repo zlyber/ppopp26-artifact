@@ -166,7 +166,7 @@ SyncedMemory& logic_quotient_term(
 
  SyncedMemory& logic_linearisation_term(SyncedMemory& selector_poly,SyncedMemory& separation_challenge,  WitnessValues& wit_vals, Custom_class& custom_vals) {
     
-     SyncedMemory& temp = _constraints(separation_challenge, wit_vals, custom_vals);
+     SyncedMemory& temp = logic_constraints(separation_challenge, wit_vals, custom_vals);
      SyncedMemory& res = poly_mul_const(selector_poly, temp);
     
     return res;
