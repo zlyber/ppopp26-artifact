@@ -1,7 +1,6 @@
 #pragma once
-#include <iostream>
 #include "caffe/syncedmem.hpp"
-#include <assert.h>
+#include <cassert>
 
 using namespace caffe;
 

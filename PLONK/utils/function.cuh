@@ -1,6 +1,5 @@
 #pragma once
 #include <iostream>
-#include <vector>
 #include "caffe/syncedmem.hpp"
 #include "PLONK/utils/mont/cuda/curve_def.cuh"
 #include "PLONK/utils/mont/cpu/mont_arithmetic.h"

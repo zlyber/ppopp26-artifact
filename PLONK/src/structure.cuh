@@ -1,6 +1,4 @@
 #pragma once
-#include <iostream>
-#include <vector>
 #include "caffe/syncedmem.hpp"
 #include "PLONK/src/bls12_381/fq.hpp"
 #include "PLONK/utils/function.cuh"
@@ -79,6 +77,7 @@ typedef struct {
     uint64_t n;
     uint64_t lookup_len;
     uint64_t intended_pi_pos;
+    uint64_t* public_inputs;
     uint64_t* cs_q_lookup;
     uint64_t* w_l;
     uint64_t* w_r;
@@ -181,6 +180,7 @@ class Circuit {
         uint64_t n;
         uint64_t lookup_len;
         uint64_t intended_pi_pos;
+        SyncedMemory& public_inputs;
         SyncedMemory& cs_q_lookup;
         SyncedMemory& w_l;
         SyncedMemory& w_r;
@@ -190,6 +190,7 @@ class Circuit {
         uint64_t n,
         uint64_t lookup_len,
         uint64_t intended_pi_pos,
+        SyncedMemory& public_inputs,
         SyncedMemory& cs_q_lookup,
         SyncedMemory& w_l,
         SyncedMemory& w_r,
@@ -288,6 +289,20 @@ class ProverKey{
         SyncedMemory& fourth_sigma_coeffs, SyncedMemory& fourth_sigma_evals,
         SyncedMemory& linear_evaluations,
         SyncedMemory& v_h_coset_8n);
+};
+
+class labeldpoly {
+    public:
+        SyncedMemory& poly;
+        int hiding_bound;
+        labeldpoly(SyncedMemory& poly_, int hiding_bound_):poly(poly_), hiding_bound(hiding_bound_){}
+};
+
+class witness_poly {
+    public:
+        SyncedMemory& witness;
+        SyncedMemory& random_witness;
+        witness_poly(SyncedMemory& witness_, SyncedMemory& random_witness_):witness(witness_), random_witness(random_witness_){}
 };
 
 ProverKey load_pk(ProverKeyC pk, uint64_t n);

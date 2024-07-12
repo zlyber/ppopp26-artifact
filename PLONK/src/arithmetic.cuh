@@ -1,9 +1,6 @@
 #pragma once
 #include <iostream>
-#include <vector>
-#include <array>
 #include <random>
-#include <chrono>
 #include <cuda_runtime.h>
 #include "PLONK/src/bls12_381/fr.hpp"
 #include "PLONK/src/structure.cuh"

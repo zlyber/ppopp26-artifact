@@ -77,7 +77,6 @@ SyncedMemory& poly_add_poly_mul_const(SyncedMemory& self, SyncedMemory& f, Synce
     }
 }
     
-
 void rand_poly(SyncedMemory& poly) {
     std::mt19937_64 gen(42);
     std::uniform_int_distribution<uint64_t> dis(0, UINT64_MAX);

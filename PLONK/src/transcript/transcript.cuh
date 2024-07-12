@@ -28,8 +28,9 @@ public:
         append_message(label, buf);
         free(buf);
     }
-
-    void append(char* label, SyncedMemory& item) {
+    
+    template <typename T>
+    void append(char* label, T& item) {
         uint8_t* buf = nullptr;
         serialize(buf, item);
         append_message(label, buf);

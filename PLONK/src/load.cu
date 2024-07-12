@@ -280,6 +280,7 @@ Circuit::Circuit(
         uint64_t n,
         uint64_t lookup_len,
         uint64_t intended_pi_pos,
+        SyncedMemory& public_inputs,
         SyncedMemory& cs_q_lookup,
         SyncedMemory& w_l,
         SyncedMemory& w_r,
@@ -287,6 +288,7 @@ Circuit::Circuit(
         SyncedMemory& w_4
     ) : n(n), lookup_len(lookup_len),
         intended_pi_pos(intended_pi_pos),
+        public_inputs(public_inputs),
         cs_q_lookup(cs_q_lookup),
         w_l(w_l),
         w_r(w_r),
@@ -298,6 +300,10 @@ Circuit load_cs(CircuitC cs, uint64_t n){
     SyncedMemory q_lookup(n*fr::Limbs*sizeof(uint64_t));
     void* q_lookup_gpu = q_lookup.mutable_gpu_data();
     caffe_gpu_memcpy(q_lookup.size(), q_lookup_gpu, cs.cs_q_lookup);
+
+    SyncedMemory pi(fr::Limbs*sizeof(uint64_t));
+    void* pi_gpu = q_lookup.mutable_gpu_data();
+    caffe_gpu_memcpy(pi.size(), pi_gpu, cs.public_inputs);
 
     SyncedMemory w_l(n*fr::Limbs*sizeof(uint64_t));
     void* w_l_gpu = w_l.mutable_gpu_data();
@@ -315,7 +321,7 @@ Circuit load_cs(CircuitC cs, uint64_t n){
     void* w_4_gpu = w_o.mutable_gpu_data();
     caffe_gpu_memcpy(w_4.size(), w_4_gpu, cs.w_4);
 
-    return Circuit(cs.n,cs.lookup_len,cs.intended_pi_pos,
+    return Circuit(cs.n,cs.lookup_len,cs.intended_pi_pos, pi,
                    q_lookup, w_l, w_r, w_o, w_4);
 }
 

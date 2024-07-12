@@ -1,9 +1,7 @@
 #pragma once
 #include <cstdint>
-#include <cstdlib>
 #include <cassert>
 #include <cstring>
-#include <iostream>
 #include "PLONK/src/bls12_381/fr.hpp"
 #include "PLONK/utils/function.cuh"
 
