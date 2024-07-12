@@ -5,10 +5,12 @@
 #include "PLONK/plonk_core/src/proof_system/widget/mod.cu"
 #include "PLONK/utils/function.cuh"
 #include "PLONK/src/arithmetic.cu"
+#include "PLONK/plonk_core/src/proof_system/widget/custom_class.cu"
+#include "PLONK/plonk_core/utils.cu"
 class Lookup {
 public:
     
-        std::tuple<SyncedMemory&, SyncedMemory&> q_lookup;
+        Custom_class& q_lookup;
 
         SyncedMemory& table_1;
 
@@ -59,11 +61,24 @@ SyncedMemory&  _compute_quotient_i(
     void* one_gpu_data=one.mutable_gpu_data();
     
     
-    SyncedMemory&  compressed_tuple = torch::compress(w_l_i, w_r_i, w_o_i, w_4_i, zeta); 
+    // SyncedMemory&  compressed_tuple = torch::compress(w_l_i, w_r_i, w_o_i, w_4_i, zeta);
+    SyncedMemory  compressed_tuple(w_l_i.size()+w_r_i.size()+w_o_i.size()+w_4_i.size()+zeta.size());
+    void* compressed_tuple_gpu_data = compressed_tuple.mutable_gpu_data();
+    void* w_l_i_gpu_data = w_l_i.mutable_gpu_data();
+    void* w_r_i_gpu_data = w_r_i.mutable_gpu_data();
+    void* w_o_i_gpu_data = w_o_i.mutable_gpu_data();
+    void* w_4_i_gpu_data = w_4_i.mutable_gpu_data();
+    caffe_gpu_memcpy(w_l_i.size(), w_l_i_gpu_data, compressed_tuple_gpu_data);
+    caffe_gpu_memcpy(w_r_i.size(), w_r_i_gpu_data, compressed_tuple_gpu_data+w_l_i.size());
+    caffe_gpu_memcpy(w_o_i.size(), w_o_i_gpu_data, compressed_tuple_gpu_data+w_l_i.size()+w_r_i.size());
+    caffe_gpu_memcpy(w_4_i.size(), w_4_i_gpu_data, compressed_tuple_gpu_data+w_l_i.size()+w_r_i.size()+w_o_i.size());
+    caffe_gpu_memcpy(zeta.size(), zeta_gpu_data, compressed_tuple_gpu_data+w_l_i.size()+w_r_i.size()+w_o_i.size()+w_4_i.size());
+    
+
     SyncedMemory&  f_i = coset_ntt.forward(f_poly);
-    SyncedMemory&  mid = sub_mod(compressed_tuple, f_i);
-    mid = mul_mod(proverkey_q_lookup, mid);
-    SyncedMemory&  a = mul_mod_scalar(mid, lookup_sep);
+    SyncedMemory&  mid_temp_1 = sub_mod(compressed_tuple, f_i);
+    SyncedMemory&  mid_temp_2 = mul_mod(proverkey_q_lookup, mid_temp_1);
+    SyncedMemory&  a = mul_mod_scalar(mid_temp_2, lookup_sep);
     // mid = nullptr; 
 
    
@@ -173,8 +188,8 @@ SyncedMemory& compute_linearisation_lookup(
     void* one_gpu_data= one.mutable_gpu_data();
     SyncedMemory&  one_plus_delta = add_mod(delta,one);
     SyncedMemory&  epsilon_one_plus_delta = mul_mod(epsilon, one_plus_delta);
-
-    SyncedMemory&  compressed_tuple = lc({a_eval, b_eval, c_eval, d_eval}, zeta);
+    std::vector<SyncedMemory&> vec = {a_eval, b_eval, c_eval, d_eval};
+    SyncedMemory&  compressed_tuple = lc(vec, zeta);
     SyncedMemory&  compressed_tuple_sub_f_eval = sub_mod(compressed_tuple, f_eval);
     SyncedMemory&  const1 = mul_mod(compressed_tuple_sub_f_eval, lookup_sep);
     SyncedMemory& a = poly_mul_const(pk_q_lookup, const1);

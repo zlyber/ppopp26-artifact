@@ -10,14 +10,13 @@
 
 class WitnessValues {
 public:
-    WitnessValues( SyncedMemory& a_val,  SyncedMemory& b_val,  SyncedMemory& c_val,  SyncedMemory& d_val) 
-        : a_val(a_val), b_val(b_val), c_val(c_val), d_val(d_val) {}
-
-
     SyncedMemory& a_val;
     SyncedMemory& b_val;
     SyncedMemory& c_val;
     SyncedMemory& d_val;
+    WitnessValues( SyncedMemory& a_val,  SyncedMemory& b_val,  SyncedMemory& c_val,  SyncedMemory& d_val) 
+        : a_val(a_val), b_val(b_val), c_val(c_val), d_val(d_val) {}
+
 };
 
 SyncedMemory& delta( SyncedMemory& f) {

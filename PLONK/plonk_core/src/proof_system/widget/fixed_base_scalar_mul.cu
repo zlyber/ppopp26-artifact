@@ -29,10 +29,8 @@ public:
     }
 };
 
-class FBSMGate {
-public:
-    SyncedMemory& constraints(
-        SyncedMemory& separation_challenge, const WitnessValues& wit_vals, const FBSMValues& custom_vals
+SyncedMemory& FBSMGate_constraints(
+        SyncedMemory& separation_challenge,  WitnessValues& wit_vals, const FBSMValues& custom_vals
     ) {
 
         SyncedMemory& kappa = mul_mod(separation_challenge, separation_challenge);
@@ -40,7 +38,7 @@ public:
         SyncedMemory& kappa_cu = mul_mod(kappa_sq, kappa);
         SyncedMemory& one = fr::one();
         void* one_gpu_data =one.mutable_gpu_data();
-    
+
 
         SyncedMemory& acc_x = wit_vals.a_val;
         SyncedMemory& acc_x_next = custom_vals.a_next_val;
@@ -109,11 +107,10 @@ public:
         SyncedMemory& res = mul_mod(checks, separation_challenge);
         return res;
     }
-    
-    SyncedMemory& quotient_term( SyncedMemory& selector,SyncedMemory& separation_challenge,WitnessValues wit_vals,FBSMValues custom_vals) 
-    {
-        SyncedMemory& bit_consistency = mul_mod_scalar(selector, custom_vals.q_c_val);
 
+SyncedMemory& FBSMGate_quotient_term( SyncedMemory& selector,SyncedMemory& separation_challenge,WitnessValues wit_vals,FBSMValues custom_vals) {
+
+    SyncedMemory& bit_consistency = mul_mod_scalar(selector, custom_vals.q_c_val);
     SyncedMemory& kappa = mul_mod(separation_challenge, separation_challenge);
     SyncedMemory& kappa_sq = mul_mod(kappa, kappa);
     SyncedMemory& kappa_cu = mul_mod(kappa_sq, kappa);
@@ -187,15 +184,14 @@ public:
     SyncedMemory& res_temp_2 = mul_mod_scalar(res_temp_1, separation_challenge);
     SyncedMemory& res = mul_mod(selector, res_temp_2);
     return res;
-}
+    }
 
-    SyncedMemory& linearisation_term(SyncedMemory&selector_poly, SyncedMemory& separation_challenge, WitnessValues&wit_vals, FBSMValues&custom_vals) {
-        
+SyncedMemory& FBSMGate_linearisation_term(SyncedMemory&selector_poly, SyncedMemory& separation_challenge, WitnessValues&wit_vals, FBSMValues&custom_vals) {    
         SyncedMemory&temp = FBSMGate::constraints(separation_challenge, wit_vals, custom_vals);
         SyncedMemory&res = poly_mul_const(selector_poly, temp);
         return res;
     }
-};
+
 SyncedMemory& extract_bit(SyncedMemory&curr_acc, SyncedMemory& next_acc) {
     
     SyncedMemory& res_temp = sub_mod(next_acc, curr_acc);

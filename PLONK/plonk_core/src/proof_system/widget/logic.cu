@@ -65,7 +65,7 @@ SyncedMemory& _delta_xor_and(
     SyncedMemory& res = add_mod(b_res, e);
     return res;
 }
-SyncedMemory& _constraints(SyncedMemory& separation_challenge, WitnessValues& wit_vals, Custom_class& custom_vals) {
+SyncedMemory& logic_constraints(SyncedMemory& separation_challenge, WitnessValues& wit_vals, Custom_class& custom_vals) {
 
     
     SyncedMemory& four = fr::make_tensor(4);
@@ -112,7 +112,7 @@ SyncedMemory& _constraints(SyncedMemory& separation_challenge, WitnessValues& wi
     return res;
 }
 
-SyncedMemory& quotient_term(
+SyncedMemory& logic_quotient_term(
     SyncedMemory& selector,
     SyncedMemory& separation_challenge,
     WitnessValues wit_vals,
@@ -164,7 +164,7 @@ SyncedMemory& quotient_term(
     return res;
 }
 
- SyncedMemory& linearisation_term(SyncedMemory& selector_poly,SyncedMemory& separation_challenge,  WitnessValues& wit_vals, Custom_class& custom_vals) {
+ SyncedMemory& logic_linearisation_term(SyncedMemory& selector_poly,SyncedMemory& separation_challenge,  WitnessValues& wit_vals, Custom_class& custom_vals) {
     
      SyncedMemory& temp = _constraints(separation_challenge, wit_vals, custom_vals);
      SyncedMemory& res = poly_mul_const(selector_poly, temp);

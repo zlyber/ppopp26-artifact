@@ -9,8 +9,9 @@
 #include "PLONK/src/domain.cuh"
 #include "PLONK/src/domain.cu"
 #include "PLONK/plonk_core/src/proof_system/widget/mod.cu"
+#include "PLONK/plonk_core/src/proof_system/widget/custom_class.cu"
 #include <string>
-SyncedMemory& _constraints(SyncedMemory& separation_challenge, const WitnessValues& wit_vals, std::map<std::string, SyncedMemory&> custom_vals) {
+SyncedMemory& range_constraints(SyncedMemory& separation_challenge,  WitnessValues& wit_vals, Custom_class& custom_vals) {
 
     SyncedMemory& four = fr::make_tensor(4);
     void* four_gpu_data=four.mutable_gpu_data();
@@ -38,7 +39,7 @@ SyncedMemory& _constraints(SyncedMemory& separation_challenge, const WitnessValu
 
    
     SyncedMemory& b_4_1 = mul_mod(four, wit_vals.a_val);
-    SyncedMemory& b_4_2 = sub_mod(custom_vals["d_next_eval"], b_4_1);
+    SyncedMemory& b_4_2 = sub_mod(custom_vals.d_next_eval, b_4_1);
     SyncedMemory& f_b4 = delta(b_4_2);
     SyncedMemory& b_4 = mul_mod(f_b4, kappa_cu);
 
@@ -51,7 +52,7 @@ SyncedMemory& _constraints(SyncedMemory& separation_challenge, const WitnessValu
     return res;
 }
 
-SyncedMemory& quotient_term(SyncedMemory& selector, SyncedMemory& separation_challenge, const WitnessValues& wit_vals, const CustomValues& custom_vals) {
+SyncedMemory& quotient_term(SyncedMemory& selector, SyncedMemory& separation_challenge,  WitnessValues& wit_vals,  Custom_class& custom_vals) {
  
     SyncedMemory& four = fr::make_tensor(4);
     void* four_gpu_data=four.mutable_gpu_data();
@@ -62,52 +63,52 @@ SyncedMemory& quotient_term(SyncedMemory& selector, SyncedMemory& separation_cha
     SyncedMemory& kappa_cu = mul_mod(kappa_sq, kappa);
 
 
-    SyncedMemory& mid = mul_mod_scalar(wit_vals.d_val, four);
-    mid = sub_mod(wit_vals.c_val, mid);
-    SyncedMemory& b_1 = delta(mid);
+    SyncedMemory& mid_temp_1 = mul_mod_scalar(wit_vals.d_val, four);
+    SyncedMemory& mid_temp_2 = sub_mod(wit_vals.c_val, mid_temp_1);
+    SyncedMemory& b_1 = delta(mid_temp_2);
 
     
-    mid = mul_mod_scalar(wit_vals.c_val, four);
-    mid = sub_mod(wit_vals.b_val, mid);
-    mid = delta(mid);
+    SyncedMemory& mid_temp_3 = mul_mod_scalar(wit_vals.c_val, four);
+    SyncedMemory& mid_temp_4 = sub_mod(wit_vals.b_val, mid_temp_3);
+    SyncedMemory& mid_temp_5 = delta(mid_temp_4);
     void* kappa_gpu_data=kappa.mutable_gpu_data();
-    SyncedMemory& b_2 = mul_mod_scalar(mid, kappa);
+    SyncedMemory& b_2 = mul_mod_scalar(mid_temp_5, kappa);
 
-    SyncedMemory& mid1 = add_mod(b_1, b_2);
+    SyncedMemory& mid1_temp_1 = add_mod(b_1, b_2);
     // b_1.reset(); b_2.reset(); 
 
-  
-    mid = mul_mod_scalar(wit_vals.b_val, four);
-    mid = sub_mod(wit_vals.a_val, mid);
-    mid = delta(mid);
     void* kappa_sq_gpu_data=kappa_sq.mutable_gpu_data();
-    SyncedMemory& b_3 = mul_mod_scalar(mid, kappa_sq);
+    SyncedMemory& mid_temp_6 = mul_mod_scalar(wit_vals.b_val, four);
+    SyncedMemory& mid_temp_7 = sub_mod(wit_vals.a_val, mid_temp_6);
+    SyncedMemory& mid_temp_8 = delta(mid_temp_7);
+    SyncedMemory& b_3 = mul_mod_scalar(mid_temp_8, kappa_sq);
 
-    mid1 = add_mod(mid1, b_3);
+    SyncedMemory& mid1_temp_2 = add_mod(mid1_temp_1, b_3);
     // b_3.reset(); 
 
+    void* kappa_cu_gpu_data=kappa_cu.mutable_gpu_data();
+    SyncedMemory& mid_temp_9 = mul_mod_scalar(wit_vals.a_val, four);
+    SyncedMemory& mid_temp_10 = sub_mod(custom_vals.d_next_eval, mid_temp_9);
+    SyncedMemory& mid_temp_11 = delta(mid_temp_10);
+    SyncedMemory& b_4 = mul_mod_scalar(mid_temp_11, kappa_cu);
 
-    mid = mul_mod_scalar(wit_vals.a_val, four);
-    mid = sub_mod(custom_vals["d_next_eval"], mid);
-    mid = delta(mid);
-    SyncedMemory& b_4 = mul_mod_scalar(mid, kappa_cu.to("cuda"));
-
-    mid = add_mod(mid1, b_4);
+    SyncedMemory& mid = add_mod(mid1_temp_2, b_4);
     // b_4.reset(); 
-    
-    SyncedMemory& temp = mul_mod_scalar(mid, separation_challenge.to("cuda"));
+    void* separation_challenge_gpu_data=separation_challenge.mutable_gpu_data();
+    SyncedMemory& temp = mul_mod_scalar(mid, separation_challenge);
 
     SyncedMemory& res = mul_mod(selector, temp);
     return res;
 }
 
-SyncedMemory& linearisation_term(SyncedMemory& selector_poly, SyncedMemory& separation_challenge, const WitnessValues& wit_vals, const CustomValues& custom_vals) {
-    SyncedMemory& temp = _constraints(separation_challenge, wit_vals, custom_vals);
-    SyncedMemory res(selector_poly.size());
+SyncedMemory& range_linearisation_term(SyncedMemory& selector_poly, SyncedMemory& separation_challenge,  WitnessValues& wit_vals, Customclass& custom_vals) {
+    SyncedMemory& temp = range_constraints(separation_challenge, wit_vals, custom_vals);
     if (selector_poly.size()/(8*4) == 0) {
-        res = selector_poly;
+        SyncedMemory& res = selector_poly;
+        return res;
     } else {
-        res = mul_mod_scalar(selector_poly, temp);
+       SyncedMemory& res = mul_mod_scalar(selector_poly, temp);
+       return res;
     }
-    return res;
+    
 }
