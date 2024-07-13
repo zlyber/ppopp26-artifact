@@ -200,37 +200,49 @@ class Circuit {
 };
 
 
+struct LookupTable {
+    SyncedMemory& q_lookup;
+    SyncedMemory& table1;
+    SyncedMemory& table2;
+    SyncedMemory& table3;
+    SyncedMemory& table4;
+
+    LookupTable(SyncedMemory& ql, SyncedMemory& t1, SyncedMemory& t2, SyncedMemory& t3, SyncedMemory& t4);
+};
+
+struct Permutation
+{
+    SyncedMemory& left_sigma;
+    SyncedMemory& right_sigma;
+    SyncedMemory& out_sigma;
+    SyncedMemory& fourth_sigma;
+
+    Permutation(SyncedMemory& ls, SyncedMemory& rs, SyncedMemory& os, SyncedMemory& fs);
+};
+
+struct Arithmetic
+{
+    SyncedMemory& q_m;
+    SyncedMemory& q_l;
+    SyncedMemory& q_r;
+    SyncedMemory& q_o;
+    SyncedMemory& q_4;
+    SyncedMemory& q_c;
+    SyncedMemory& q_hl;
+    SyncedMemory& q_hr;
+    SyncedMemory& q_h4;
+    SyncedMemory& q_arith;
+
+    Arithmetic(SyncedMemory& qm, SyncedMemory& ql, SyncedMemory& qr,
+               SyncedMemory& qo, SyncedMemory& q4, SyncedMemory& qc,
+               SyncedMemory& qhl, SyncedMemory& qhr, SyncedMemory& qh4,
+               SyncedMemory& qarith);
+};
+
 class ProverKey{
     public:
-        SyncedMemory& q_m_coeffs;
-        SyncedMemory& q_m_evals;
-
-        SyncedMemory& q_l_coeffs;
-        SyncedMemory& q_l_evals;
-
-        SyncedMemory& q_r_coeffs;
-        SyncedMemory& q_r_evals;
-
-        SyncedMemory& q_o_coeffs;
-        SyncedMemory& q_o_evals;
-
-        SyncedMemory& q_4_coeffs;
-        SyncedMemory& q_4_evals;
-
-        SyncedMemory& q_c_coeffs;
-        SyncedMemory& q_c_evals;
-
-        SyncedMemory& q_hl_coeffs;
-        SyncedMemory& q_hl_evals;
-
-        SyncedMemory& q_hr_coeffs;
-        SyncedMemory& q_hr_evals;
-
-        SyncedMemory& q_h4_coeffs;
-        SyncedMemory& q_h4_evals;
-
-        SyncedMemory& q_arith_coeffs;
-        SyncedMemory& q_arith_evals;
+        Arithmetic arithmetic_coeffs;
+        Arithmetic arithmetic_evals;
 
         SyncedMemory& range_selector_coeffs;
         SyncedMemory& range_selector_evals;
@@ -244,24 +256,11 @@ class ProverKey{
         SyncedMemory& variable_group_add_selector_coeffs;
         SyncedMemory& variable_group_add_selector_evals;
 
-        SyncedMemory& q_lookup_coeffs;
-        SyncedMemory& q_lookup_evals;
-        SyncedMemory& table1;
-        SyncedMemory& table2;
-        SyncedMemory& table3;
-        SyncedMemory& table4;
+        LookupTable lookup_coeffs;
+        SyncedMemory& lookup_evals;
 
-        SyncedMemory& left_sigma_coeffs;
-        SyncedMemory& left_sigma_evals;
-
-        SyncedMemory& right_sigma_coeffs;
-        SyncedMemory& right_sigma_evals;
-
-        SyncedMemory& out_sigma_coeffs;
-        SyncedMemory& out_sigma_evals;
-
-        SyncedMemory& fourth_sigma_coeffs;
-        SyncedMemory& fourth_sigma_evals;
+        Permutation permutation_coeffs;
+        Permutation permutation_evals;
 
         SyncedMemory& linear_evaluations;
 

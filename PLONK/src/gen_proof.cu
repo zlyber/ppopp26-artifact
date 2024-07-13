@@ -53,7 +53,7 @@ ProofC gen_proof(ProverKeyC pkc, CircuitC csc, CommitKeyC ckc){
     void* zeta_gpu = zeta.mutable_gpu_data();
 
     // Compress lookup table into vector of single elements
-    SyncedMemory& compressed_t_multiset = compress(pk.table1, pk.table2, pk.table3, pk.table4, zeta);
+    SyncedMemory& compressed_t_multiset = compress(pk.lookup_coeffs.table1, pk.lookup_coeffs.table2, pk.lookup_coeffs.table3, pk.lookup_coeffs.table4, zeta);
 
     // Compute table poly
     SyncedMemory& table_poly = INTT.forward(compressed_t_multiset);

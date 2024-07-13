@@ -1,6 +1,19 @@
 #include "PLONK/src/structure.cuh"
 #include "PLONK/src/bls12_381/fr.hpp"
 
+LookupTable::LookupTable(SyncedMemory& ql, SyncedMemory& t1, SyncedMemory& t2, SyncedMemory& t3, SyncedMemory& t4)
+    : q_lookup(ql), table1(t1), table2(t2), table3(t3), table4(t4) {}
+
+Arithmetic::Arithmetic(SyncedMemory& qm, SyncedMemory& ql, SyncedMemory& qr,
+               SyncedMemory& qo, SyncedMemory& q4, SyncedMemory& qc,
+               SyncedMemory& qhl, SyncedMemory& qhr, SyncedMemory& qh4,
+               SyncedMemory& qarith)
+        : q_m(qm), q_l(ql), q_r(qr), q_o(qo), q_4(q4),
+          q_c(qc), q_hl(qhl), q_hr(qhr), q_h4(qh4), q_arith(qarith) {}
+
+Permutation::Permutation(SyncedMemory& ls, SyncedMemory& rs, SyncedMemory& os, SyncedMemory& fs)
+        : left_sigma(ls), right_sigma(rs), out_sigma(os), fourth_sigma(fs) {}
+
 ProverKey::ProverKey(
         SyncedMemory& q_m_coeffs, SyncedMemory& q_m_evals,
         SyncedMemory& q_l_coeffs, SyncedMemory& q_l_evals,
@@ -24,26 +37,17 @@ ProverKey::ProverKey(
         SyncedMemory& fourth_sigma_coeffs, SyncedMemory& fourth_sigma_evals,
         SyncedMemory& linear_evaluations,
         SyncedMemory& v_h_coset_8n) : 
-        q_m_coeffs(q_m_coeffs), q_m_evals(q_m_evals),
-        q_l_coeffs(q_l_coeffs), q_l_evals(q_l_evals),
-        q_r_coeffs(q_r_coeffs), q_r_evals(q_r_evals),
-        q_o_coeffs(q_o_coeffs), q_o_evals(q_o_evals),
-        q_4_coeffs(q_4_coeffs), q_4_evals(q_4_evals),
-        q_c_coeffs(q_c_coeffs), q_c_evals(q_c_evals),
-        q_hl_coeffs(q_hl_coeffs), q_hl_evals(q_hl_evals),
-        q_hr_coeffs(q_hr_coeffs), q_hr_evals(q_hr_evals),
-        q_h4_coeffs(q_h4_coeffs), q_h4_evals(q_h4_evals),
-        q_arith_coeffs(q_arith_coeffs), q_arith_evals(q_arith_evals),
+        arithmetic_coeffs(Arithmetic(q_m_coeffs, q_l_coeffs, q_r_coeffs, q_o_coeffs, 
+                                     q_4_coeffs, q_c_coeffs, q_hl_coeffs, q_hr_coeffs, q_h4_coeffs, q_arith_coeffs)),
+        arithmetic_evals(Arithmetic(q_m_evals, q_l_evals, q_r_evals, q_o_evals, 
+                                    q_4_evals, q_c_evals, q_hl_evals, q_hr_evals, q_h4_evals, q_arith_evals)),
         range_selector_coeffs(range_selector_coeffs), range_selector_evals(range_selector_evals),
         logic_selector_coeffs(logic_selector_coeffs), logic_selector_evals(logic_selector_evals),
         fixed_group_add_selector_coeffs(fixed_group_add_selector_coeffs), fixed_group_add_selector_evals(fixed_group_add_selector_evals),
         variable_group_add_selector_coeffs(variable_group_add_selector_coeffs), variable_group_add_selector_evals(variable_group_add_selector_evals),
-        q_lookup_coeffs(q_lookup_coeffs), q_lookup_evals(q_lookup_evals),
-        table1(table1), table2(table2), table3(table3), table4(table4),
-        left_sigma_coeffs(left_sigma_coeffs), left_sigma_evals(left_sigma_evals),
-        right_sigma_coeffs(right_sigma_coeffs), right_sigma_evals(right_sigma_evals),
-        out_sigma_coeffs(out_sigma_coeffs), out_sigma_evals(out_sigma_evals),
-        fourth_sigma_coeffs(fourth_sigma_coeffs), fourth_sigma_evals(fourth_sigma_evals),
+        lookup_coeffs(LookupTable(q_lookup_coeffs, table1, table2, table3, table4)), lookup_evals(q_lookup_evals),
+        permutation_coeffs(Permutation(left_sigma_coeffs, right_sigma_coeffs, out_sigma_coeffs, fourth_sigma_coeffs)),
+        permutation_evals(Permutation(left_sigma_evals, right_sigma_evals, out_sigma_evals, fourth_sigma_evals)),
         linear_evaluations(linear_evaluations),
         v_h_coset_8n(v_h_coset_8n) {}
 
