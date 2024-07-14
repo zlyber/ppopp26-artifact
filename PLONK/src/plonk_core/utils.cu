@@ -7,9 +7,9 @@
 // v_0 + challenge * v_1 + ... + challenge^k  * v_k
 SyncedMemory& lc( std::vector<SyncedMemory&>&values, SyncedMemory& challenge) {
     
-    SyncedMemory& kth_val = values.back();
+    SyncedMemory& kth_val_temp = values.back();
     for (auto it = values.rbegin() + 1; it != values.rend(); ++it) {
-        kth_val = mul_mod_scalar(kth_val, challenge);
+        kth_val = mul_mod_scalar(kth_val_temp, challenge);
         kth_val = add_mod(kth_val, *it); 
     }
     return kth_val;

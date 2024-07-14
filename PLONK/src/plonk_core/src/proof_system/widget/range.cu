@@ -56,7 +56,7 @@ SyncedMemory& range_constraints(SyncedMemory& separation_challenge,  WitnessValu
     return res;
 }
 
-SyncedMemory& quotient_term(SyncedMemory& selector, SyncedMemory& separation_challenge,  WitnessValues& wit_vals,  Custom_class& custom_vals) {
+SyncedMemory& range_quotient_term(SyncedMemory& selector, SyncedMemory& separation_challenge,  WitnessValues& wit_vals,  Custom_class& custom_vals) {
  
     SyncedMemory& four = fr::make_tensor(4);
     void* four_gpu_data=four.mutable_gpu_data();
@@ -106,7 +106,7 @@ SyncedMemory& quotient_term(SyncedMemory& selector, SyncedMemory& separation_cha
     return res;
 }
 
-SyncedMemory& range_linearisation_term(SyncedMemory& selector_poly, SyncedMemory& separation_challenge,  const WitnessValues& wit_vals, Custom_class& custom_vals) {
+SyncedMemory& range_linearisation_term(SyncedMemory& selector_poly, SyncedMemory& separation_challenge,   WitnessValues& wit_vals, Custom_class& custom_vals) {
     SyncedMemory& temp = range_constraints(separation_challenge, wit_vals, custom_vals);
     if (selector_poly.size()/(8*4) == 0) {
         SyncedMemory& res = selector_poly;

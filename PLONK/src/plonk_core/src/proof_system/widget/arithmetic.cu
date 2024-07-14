@@ -14,20 +14,26 @@
 #include "PLONK/src/arithmetic.cu"
 #include "PLONK/src/plonk_core/src/proof_system/widget/mod.cu"
 #define Byte_LEN 8
-struct Arith {
+struct Arithmetic
+{
     SyncedMemory& q_m;
     SyncedMemory& q_l;
     SyncedMemory& q_r;
     SyncedMemory& q_o;
     SyncedMemory& q_4;
+    SyncedMemory& q_c;
     SyncedMemory& q_hl;
     SyncedMemory& q_hr;
     SyncedMemory& q_h4;
-    SyncedMemory& q_c;
     SyncedMemory& q_arith;
+
+    Arithmetic(SyncedMemory& qm, SyncedMemory& ql, SyncedMemory& qr,
+               SyncedMemory& qo, SyncedMemory& q4, SyncedMemory& qc,
+               SyncedMemory& qhl, SyncedMemory& qhr, SyncedMemory& qh4,
+               SyncedMemory& qarith);
 };
 
- SyncedMemory& compute_quotient_i( Arith& arithmetics_evals,  WitnessValues& wit_vals) {
+ SyncedMemory& compute_quotient_i( Arithmetic& arithmetics_evals,  WitnessValues& wit_vals) {
     SyncedMemory& mult = mul_mod(wit_vals.a_val, wit_vals.b_val);
     SyncedMemory& mult = mul_mod(mult, arithmetics_evals.q_m);
     SyncedMemory& left = mul_mod(wit_vals.a_val, arithmetics_evals.q_l);
@@ -71,7 +77,7 @@ struct Arith {
      SyncedMemory& c_eval,
      SyncedMemory& d_eval,
      SyncedMemory& q_arith_eval,
-     Arith& prover_key_arithmetic) {
+     Arithmetic& prover_key_arithmetic) {
 
      SyncedMemory& mid1_1 =mul_mod(a_eval, b_eval);
 

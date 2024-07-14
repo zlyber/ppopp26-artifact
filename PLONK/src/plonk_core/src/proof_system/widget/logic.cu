@@ -123,7 +123,7 @@ SyncedMemory& logic_constraints(SyncedMemory& separation_challenge, WitnessValue
 SyncedMemory& logic_quotient_term(
     SyncedMemory& selector,
     SyncedMemory& separation_challenge,
-    WitnessValues wit_vals,
+    WitnessValues& wit_vals,
     Custom_class& custom_vals
 ) {
     SyncedMemory& four = fr::make_tensor(4);

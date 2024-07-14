@@ -71,7 +71,7 @@ public:
 };
 
 
-std::tuple<SyncedMemory&, ProofEvaluations> compute_linearisation_poly(
+Linearisation_poly& compute_linearisation_poly(
     Radix2EvaluationDomain domain,
     ProverKey& pk,
     SyncedMemory& alpha,
@@ -298,7 +298,8 @@ std::tuple<SyncedMemory&, ProofEvaluations> compute_linearisation_poly(
     ProofEvaluations proof_evaluations = ProofEvaluations(
         wire_evals, perm_evals, lookup_evals, custom_evals
     );
-    return std::make_tuple(linearisation_polynomial, proof_evaluations);
+    Linearisation_poly res(linearisation_polynomial, proof_evaluations);
+    return res;
 }
 
 SyncedMemory& compute_gate_constraint_satisfiability(
@@ -320,13 +321,13 @@ SyncedMemory& compute_gate_constraint_satisfiability(
 
 
     
-    SyncedMemory arithmetic = compute_linearisation_arithmetic(
+    SyncedMemory& arithmetic = compute_linearisation_arithmetic(
         wire_evals.a_eval,
         wire_evals.b_eval,
         wire_evals.c_eval,
         wire_evals.d_eval,
         q_arith_eval,
-        pk
+        pk.arithmetic_coeffs
     );
 
     

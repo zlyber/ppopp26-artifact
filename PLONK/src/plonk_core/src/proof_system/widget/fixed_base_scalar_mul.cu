@@ -108,7 +108,7 @@ SyncedMemory& FBSMGate_constraints(
         return res;
     }
 
-SyncedMemory& FBSMGate_quotient_term( SyncedMemory& selector,SyncedMemory& separation_challenge,WitnessValues wit_vals,FBSMValues custom_vals) {
+SyncedMemory& FBSMGate_quotient_term( SyncedMemory& selector,SyncedMemory& separation_challenge,WitnessValues& wit_vals,FBSMValues& custom_vals) {
 
     SyncedMemory& bit_consistency = mul_mod_scalar(selector, custom_vals.q_c_val);
     SyncedMemory& kappa = mul_mod(separation_challenge, separation_challenge);

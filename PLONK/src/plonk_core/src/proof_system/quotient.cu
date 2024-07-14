@@ -12,6 +12,7 @@
 #include "PLONK/src/plonk_core/src/proof_system/widget/range.cu"
 #include "PLONK/src/plonk_core/src/proof_system/widget/logic.cu"
 #include "PLONK/src/plonk_core/src/proof_system/widget/fixed_base_scalar_mul.cu"
+#include "PLONK/src/plonk_core/src/proof_system/permutation.cu"
 SyncedMemory& compute_first_lagrange_poly_scaled(int n, SyncedMemory& scale) {
     Intt intt(n);
     SyncedMemory& x_evals = pad_poly(scale, n);
@@ -26,7 +27,6 @@ SyncedMemory& compute_gate_constraint_satisfiability(
     SyncedMemory& logic_challenge,
     SyncedMemory& fixed_base_challenge,
     SyncedMemory& var_base_challenge,
-    Arith& arithmetics_evals,
     ProverKey& pk,
     SyncedMemory& wl_eval_8n,
     SyncedMemory& wr_eval_8n,
@@ -56,26 +56,27 @@ SyncedMemory& compute_gate_constraint_satisfiability(
     Custom_class custom_vals(
         wl_eval_8n_slice_tail,
         wr_eval_8n_slice_tail,
-        wo_eval_8n_slice_tail,
         w4_eval_8n_slice_tail,
-        arithmetics_evals.q_l,
-        arithmetics_evals.q_r,
-        arithmetics_evals.q_c,
-        arithmetics_evals.q_hl,
-        arithmetics_evals.q_hr,
-        arithmetics_evals.q_h4
+        pk.arithmetic_evals.q_l,
+        pk.arithmetic_evals.q_r,
+        pk.arithmetic_evals.q_c,
+        pk.arithmetic_evals.q_arith,
+        pk.lookup_coeffs.q_lookup,
+        pk.arithmetic_evals.q_hl,
+        pk.arithmetic_evals.q_hr,
+        pk.arithmetic_evals.q_h4
     );
 
-    SyncedMemory& arithmetic = compute_quotient_i(arithmetics_evals, wit_vals);
+    SyncedMemory& arithmetic = compute_quotient_i(pk.arithmetic_evals, wit_vals);
 
-    SyncedMemory& range_term = range_constraint_quotient_term(
+    SyncedMemory& range_term = range_quotient_term(
         pk.range_selector_coeffs,
         range_challenge,
         wit_vals,
         custom_vals
     );
 
-    SyncedMemory& logic_term = logic_constraint_quotient_term(
+    SyncedMemory& logic_term = logic_quotient_term(
         pk.logic_selector_coeffs,
         logic_challenge,
         wit_vals,
@@ -108,8 +109,6 @@ SyncedMemory& compute_gate_constraint_satisfiability(
 SyncedMemory& compute_permutation_checks(
     int n,
     Ntt_coset& coset_ntt,
-    SyncedMemory& linear_evaluations_evals,
-    SyncedMemory& permutations_evals,
     SyncedMemory& wl_eval_8n,
     SyncedMemory& wr_eval_8n,
     SyncedMemory& wo_eval_8n,
@@ -138,7 +137,6 @@ SyncedMemory& compute_permutation_checks(
     SyncedMemory& l1_alpha_sq_evals_slice_tail=get_tail(l1_alpha_sq_evals,size);
     SyncedMemory& quotient = permutation_compute_quotient(
         size,
-        linear_evaluations_evals,
         pk,
         wl_eval_8n_slice_head,
         wr_eval_8n_slice_head,
@@ -185,7 +183,7 @@ SyncedMemory& compute_quotient_poly(
     SyncedMemory& one = fr::one();
     void* one_gpu_data= one.mutable_gpu_data();
     SyncedMemory& l1_poly = compute_first_lagrange_poly_scaled(n, one);
-    Ntt_coset ntt_coset(fr::TWO_ADICITY(),coset_size);
+    Ntt_coset ntt_coset(fr::TWO_ADICITY,coset_size);
     void* w_l_poly_gpu_data=w_l_poly.mutable_gpu_data();
     void* w_r_poly_gpu_data=w_r_poly.mutable_gpu_data();
     void* w_o_poly_gpu_data=w_o_poly.mutable_gpu_data();
@@ -198,7 +196,7 @@ SyncedMemory& compute_quotient_poly(
     caffe_gpu_memcpy(wl_eval_8n_head.size(),wl_eval_8n_gpu_data,wl_eval_8n_head_gpu_data);
     SyncedMemory& wl_eval_8n = cat(wl_eval_8n_temp,wl_eval_8n_head);
 
-    SyncedMemory wr_eval_8n_temp = ntt_coset.forward(w_r_poly);
+    SyncedMemory& wr_eval_8n_temp = ntt_coset.forward(w_r_poly);
     SyncedMemory wr_eval_8n_head(2*sizeof(uint64_t));
     void* wr_eval_8n_head_gpu_data=wr_eval_8n_head.mutable_gpu_data();
     void* wr_eval_8n_temp_gpu_data=wr_eval_8n_temp.mutable_gpu_data();
@@ -210,7 +208,8 @@ SyncedMemory& compute_quotient_poly(
     SyncedMemory& w4_eval_8n_temp = ntt_coset.forward(w_4_poly);
     SyncedMemory w4_eval_8n_head(2*sizeof(uint64_t));
     void* w4_eval_8n_head_gpu_data=w4_eval_8n_head.mutable_gpu_data();
-    caffe_gpu_memcpy(w4_eval_8n_head.size(),w4_eval_8n_temp,wr_eval_8n_head_gpu_data);
+    void* w4_eval_8n_temp_gpu_data=w4_eval_8n_temp.mutable_gpu_data();
+    caffe_gpu_memcpy(w4_eval_8n_head.size(),w4_eval_8n_temp_gpu_data,wr_eval_8n_head_gpu_data);
     SyncedMemory& w4_eval_8n = cat(w4_eval_8n,w4_eval_8n_head);
 
     SyncedMemory& gate_constraints = compute_gate_constraint_satisfiability(
@@ -219,8 +218,7 @@ SyncedMemory& compute_quotient_poly(
         logic_challenge,
         fixed_base_challenge,
         var_base_challenge,
-        pk_new.arithmetics_evals,
-        pk_new.selectors_evals,
+        pk_new,
         wl_eval_8n,
         wr_eval_8n,
         wo_eval_8n,
@@ -228,15 +226,13 @@ SyncedMemory& compute_quotient_poly(
         public_inputs_poly
     );
     void* z_poly_gpu_data= z_poly.mutable_gpu_data();
-    SyncedMemory& z_eval_8n_temp = ntt_coset,forward(z_poly);
+    SyncedMemory& z_eval_8n_temp = ntt_coset.forward(z_poly);
     SyncedMemory& z_eval_8n_head = get_head(z_eval_8n_temp,8);
     SyncedMemory& z_eval_8n=cat(z_eval_8n_temp,z_eval_8n_head);
 
     SyncedMemory& permutation = compute_permutation_checks(
         n,
-        coset_NTT,
-        pk_new.linear_evaluations,
-        pk_new.permutations_evals,
+        ntt_coset,
         wl_eval_8n,
         wr_eval_8n,
         wo_eval_8n,
@@ -244,7 +240,8 @@ SyncedMemory& compute_quotient_poly(
         z_eval_8n,
         alpha,
         beta,
-        gamma
+        gamma,
+        pk_new
     );
 
     z_eval_8n.~SyncedMemory();
@@ -271,7 +268,7 @@ SyncedMemory& compute_quotient_poly(
         epsilon,
         zeta,
         lookup_challenge,
-        pk_new.q_lookup_evals
+        pk_new.lookup_evals
     );
 
     wl_eval_8n.~SyncedMemory();
@@ -279,15 +276,15 @@ SyncedMemory& compute_quotient_poly(
     wo_eval_8n.~SyncedMemory();
     w4_eval_8n.~SyncedMemory();
     SyncedMemory&  numerator_temp_1 = add_mod(gate_constraints, permutation);
-    SyncedMemory&  gate_constraints.~SyncedMemory();
-    SyncedMemory&  permutation.~SyncedMemory();
+    gate_constraints.~SyncedMemory();
+    permutation.~SyncedMemory();
     SyncedMemory& numerator_temp_2 = add_mod(numerator_temp_1, lookup);
     lookup.~SyncedMemory();
-    SyncedMemory& denominator =inv_mod(pk_new.v_h_coset_8n_evals);
+    SyncedMemory& denominator =inv_mod(pk_new.v_h_coset_8n);
     SyncedMemory& res_temp = mul_mod(numerator_temp_2, denominator);
-    numerator.~SyncedMemory();
+    numerator_temp_2.~SyncedMemory();
     denominator.~SyncedMemory();
-    Intt_coset intt_coset(fr::TWO_ADICITY());
+    Intt_coset intt_coset(fr::TWO_ADICITY);
     SyncedMemory& res = intt_coset.forward(res_temp);
     return res;
     }
