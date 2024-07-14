@@ -5,7 +5,7 @@
 #include "caffe/syncedmem.hpp"
 #include "PLONK/src/bls12_381/fr.hpp"
 #include "PLONK/src/bls12_381/fq.hpp"
-#include "PLONK/plonk_core/src/permutation/constants.cu"
+#include "PLONK/src/plonk_core/src/permutation/constants.cu"
 #include "PLONK/src/domain.cuh"
 #include "PLONK/src/domain.cu"
 #define LEN 4 

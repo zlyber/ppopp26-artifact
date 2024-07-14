@@ -1,6 +1,6 @@
 
 #include <cuda_runtime.h>
-#include "PLONK/plonk_core/src/permutation/constants.cu"
+#include "PLONK/src/plonk_core/src/permutation/constants.cu"
 #include "PLONK/utils/function.cuh"
 #include "caffe/syncedmem.hpp"
 #include "PLONK/src/structure.cuh"
@@ -8,8 +8,8 @@
 #include "PLONK/src/bls12_381/fq.hpp"
 #include "PLONK/src/domain.cuh"
 #include "PLONK/src/domain.cu"
-#include "PLONK/plonk_core/src/proof_system/widget/mod.cu"
-#include "PLONK/plonk_core/src/proof_system/widget/custom_class.cu"
+#include "PLONK/src/plonk_core/src/proof_system/widget/mod.cu"
+#include "PLONK/src/plonk_core/src/proof_system/widget/custom_class.cu"
 #include <string>
 SyncedMemory& range_constraints(SyncedMemory& separation_challenge,  WitnessValues& wit_vals, Custom_class& custom_vals) {
 

@@ -1,5 +1,5 @@
 #include <cuda_runtime.h>
-#include "PLONK/plonk_core/src/permutation/constants.cu"
+#include "PLONK/src/plonk_core/src/permutation/constants.cu"
 #include "PLONK/utils/function.cuh"
 #include "caffe/syncedmem.hpp"
 #include "PLONK/src/structure.cuh"

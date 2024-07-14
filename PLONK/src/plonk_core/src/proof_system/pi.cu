@@ -1,8 +1,8 @@
 #include "caffe/syncedmem.hpp"
 #include "PLONK/src/bls12_381/fr.hpp"
-#include "PLONK/plonk_core/src/proof_system/widget/mod.cu"
-#include "PLONK/plonk_core/src/proof_system/widget/fixed_base_scalar_mul.cu"
-#include "PLONK/plonk_core/src/proof_system/widget/curve_addition.cu"
+#include "PLONK/src/plonk_core/src/proof_system/widget/mod.cu"
+#include "PLONK/src/plonk_core/src/proof_system/widget/fixed_base_scalar_mul.cu"
+#include "PLONK/src/plonk_core/src/proof_system/widget/curve_addition.cu"
 
 SyncedMemory& as_evals(SyncedMemory& public_inputs, int pi_pos, int n) {
     

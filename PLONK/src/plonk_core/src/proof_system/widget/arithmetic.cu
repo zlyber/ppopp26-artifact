@@ -2,7 +2,7 @@
 #include <tuple>
 #include <iostream>
 #include <cuda_runtime.h>
-#include "PLONK/plonk_core/src/permutation/constants.cu"
+#include "PLONK/src/plonk_core/src/permutation/constants.cu"
 #include "PLONK/utils/function.cuh"
 #include "caffe/syncedmem.hpp"
 #include "PLONK/src/structure.cuh"
@@ -10,9 +10,9 @@
 #include "PLONK/src/bls12_381/fq.hpp"
 #include "PLONK/src/domain.cuh"
 #include "PLONK/src/domain.cu"
-#include "PLONK/plonk_core/src/constaraint_system/hash.cu"
+#include "PLONK/src/plonk_core/src/constaraint_system/hash.cu"
 #include "PLONK/src/arithmetic.cu"
-#include "PLONK/plonk_core/src/proof_system/widget/mod.cu"
+#include "PLONK/src/plonk_core/src/proof_system/widget/mod.cu"
 #define Byte_LEN 8
 struct Arith {
     SyncedMemory& q_m;

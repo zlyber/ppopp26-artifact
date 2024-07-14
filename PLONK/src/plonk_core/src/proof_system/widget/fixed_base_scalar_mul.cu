@@ -1,9 +1,9 @@
 #include "caffe/syncedmem.hpp"
 #include "PLONK/src/bls12_381/fr.hpp"
-#include "PLONK/plonk_core/src/proof_system/widget/mod.cu"
+#include "PLONK/src/plonk_core/src/proof_system/widget/mod.cu"
 #include "PLONK/src/bls12_381/edwards.h"
 #include "PLONK/src/arithmetic.cu"
-#include "PLONK/plonk_core/src/proof_system/widget/custom_class.cu"
+#include "PLONK/src/plonk_core/src/proof_system/widget/custom_class.cu"
 class FBSMValues {
 public:
     

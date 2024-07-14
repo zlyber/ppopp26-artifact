@@ -2,18 +2,18 @@
 #include <tuple>
 #include "caffe/syncedmem.hpp"
 #include "PLONK/src/bls12_381/fr.hpp"
-#include "PLONK/plonk_core/src/proof_system/widget/mod.cu"
+#include "PLONK/src/plonk_core/src/proof_system/widget/mod.cu"
 #include "PLONK/utils/function.cuh"
 #include "PLONK/src/arithmetic.cu"
-#include "PLONK/plonk_core/src/proof_system/widget/custom_class.cu"
-#include "PLONK/plonk_core/utils.cu"
+#include "PLONK/src/plonk_core/src/proof_system/widget/custom_class.cu"
+#include "PLONK/src/plonk_core/utils.cu"
 #include "PLONK/src/load.cu"
-#include "PLONK/plonk_core/src/proof_system/widget/lookup.cu"
-#include "PLONK/plonk_core/src/proof_system/widget/range.cu"
-#include "PLONK/plonk_core/src/proof_system/widget/logic.cu"
-#include "PLONK/plonk_core/src/proof_system/widget/fixed_base_scalar_mul.cu"
-#include "PLONK/plonk_core/src/proof_system/widget/arithmetic.cu"
-#include "PLONK/plonk_core/src/proof_system/permutation.cu"
+#include "PLONK/src/plonk_core/src/proof_system/widget/lookup.cu"
+#include "PLONK/src/plonk_core/src/proof_system/widget/range.cu"
+#include "PLONK/src/plonk_core/src/proof_system/widget/logic.cu"
+#include "PLONK/src/plonk_core/src/proof_system/widget/fixed_base_scalar_mul.cu"
+#include "PLONK/src/plonk_core/src/proof_system/widget/arithmetic.cu"
+#include "PLONK/src/plonk_core/src/proof_system/permutation.cu"
 struct Linearisation_poly {
     SyncedMemory& a;
     ProofEvaluations & proof_eval;
