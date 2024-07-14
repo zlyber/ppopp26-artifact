@@ -20,14 +20,14 @@ SyncedMemory& compute_first_lagrange_poly_scaled(int n, SyncedMemory& scale) {
     return x_coeffs;
 }
 
-std::vector<SyncedMemory&> compute_gate_constraint_satisfiability(
+SyncedMemory& compute_gate_constraint_satisfiability(
     Ntt_coset& coset_NTT,
     SyncedMemory& range_challenge,
     SyncedMemory& logic_challenge,
     SyncedMemory& fixed_base_challenge,
     SyncedMemory& var_base_challenge,
-    SyncedMemory& arithmetics_evals,
-    SyncedMemory& selectors_evals,
+    Arith& arithmetics_evals,
+    ProverKey& pk,
     SyncedMemory& wl_eval_8n,
     SyncedMemory& wr_eval_8n,
     SyncedMemory& wo_eval_8n,
@@ -35,69 +35,79 @@ std::vector<SyncedMemory&> compute_gate_constraint_satisfiability(
     SyncedMemory& pi_poly) {
 
     void* pi_poly_gpu_data=pi_poly.mutable_gpu_data();
-    SyncedMemory& pi_eval_8n = coset_NTT::forward(pi_poly);
+    SyncedMemory& pi_eval_8n = coset_NTT.forward(pi_poly);
+    int size=coset_NTT.Size;
+    SyncedMemory& wl_eval_8n_head=get_head(wl_eval_8n,size);
+    SyncedMemory& wr_eval_8n_head=get_head(wr_eval_8n,size);
+    SyncedMemory& wo_eval_8n_head=get_head(wo_eval_8n,size);
+    SyncedMemory& w4_eval_8n_head=get_head(w4_eval_8n,size);
+
     WitnessValues wit_vals = {
-        wl_eval_8n.slice(0, 0, coset_NTT->Size),
-        wr_eval_8n.slice(0, 0, coset_NTT->Size),
-        wo_eval_8n.slice(0, 0, coset_NTT->Size),
-        w4_eval_8n.slice(0, 0, coset_NTT->Size),
+        wl_eval_8n_head,
+        wr_eval_8n_head,
+        wo_eval_8n_head,
+        w4_eval_8n_head,
     };
 
-
-    std::unordered_map<std::string, SyncedMemory&> custom_vals = {
-        {"a_next_eval", wl_eval_8n.slice(0, 8)},
-        {"b_next_eval", wr_eval_8n.slice(0, 8)},
-        {"d_next_eval", w4_eval_8n.slice(0, 8)},
-        {"q_l_eval", arithmetics_evals.q_l},
-        {"q_r_eval", arithmetics_evals.q_r},
-        {"q_c_eval", arithmetics_evals.q_c},
-        {"q_hl_eval", arithmetics_evals.q_hl},
-        {"q_hr_eval", arithmetics_evals.q_hr},
-        {"q_h4_eval", arithmetics_evals.q_h4},
-    };
+    SyncedMemory& wl_eval_8n_slice_tail=get_tail(wl_eval_8n,size);
+    SyncedMemory& wr_eval_8n_slice_tail=get_tail(wr_eval_8n,size);
+    SyncedMemory& wo_eval_8n_slice_tail=get_tail(wo_eval_8n,size);
+    SyncedMemory& w4_eval_8n_slice_tail=get_tail(w4_eval_8n,size);
+    Custom_class custom_vals(
+        wl_eval_8n_slice_tail,
+        wr_eval_8n_slice_tail,
+        wo_eval_8n_slice_tail,
+        w4_eval_8n_slice_tail,
+        arithmetics_evals.q_l,
+        arithmetics_evals.q_r,
+        arithmetics_evals.q_c,
+        arithmetics_evals.q_hl,
+        arithmetics_evals.q_hr,
+        arithmetics_evals.q_h4
+    );
 
     SyncedMemory& arithmetic = compute_quotient_i(arithmetics_evals, wit_vals);
 
-    SyncedMemory& range_term = range_constraint.quotient_term(
-        selectors_evals.range,
+    SyncedMemory& range_term = range_constraint_quotient_term(
+        pk.range_selector_coeffs,
         range_challenge,
         wit_vals,
         custom_vals
     );
 
-    SyncedMemory& logic_term = logic_constraint.quotient_term(
-        selectors_evals.logic,
+    SyncedMemory& logic_term = logic_constraint_quotient_term(
+        pk.logic_selector_coeffs,
         logic_challenge,
         wit_vals,
         custom_vals
     );
 
     SyncedMemory& fixed_base_scalar_mul_term = FBSMGate_quotient_term(
-        selectors_evals.fixed_group_add,
+        pk.fixed_group_add_selector_coeffs,
         fixed_base_challenge,
         wit_vals,
         FBSMValues::from_evaluations(custom_vals)
     );
 
     SyncedMemory& curve_addition_term = CAGate_quotient_term(
-        selectors_evals.variable_group_add,
+        pk.variable_group_add_selector_coeffs,
         var_base_challenge,
         wit_vals,
         CAValues::from_evaluations(custom_vals)
     );
 
-    SyncedMemory& gate_contributions_temp_1=add_mod(arithmetic, pi_eval_8n));
-    SyncedMemory& gate_contributions_temp_2=add_mod(gate_contributions_temp_1, range_term));
-    SyncedMemory& gate_contributions_temp_3=add_mod(gate_contributions_temp_2, logic_term));
-    SyncedMemory& gate_contributions_temp_4=add_mod(gate_contributions_temp_3, fixed_base_scalar_mul_term));
-    SyncedMemory& gate_contributions=add_mod(gate_contributions_temp_4, curve_addition_term));
+    SyncedMemory& gate_contributions_temp_1=add_mod(arithmetic, pi_eval_8n);
+    SyncedMemory& gate_contributions_temp_2=add_mod(gate_contributions_temp_1, range_term);
+    SyncedMemory& gate_contributions_temp_3=add_mod(gate_contributions_temp_2, logic_term);
+    SyncedMemory& gate_contributions_temp_4=add_mod(gate_contributions_temp_3, fixed_base_scalar_mul_term);
+    SyncedMemory& gate_contributions=add_mod(gate_contributions_temp_4, curve_addition_term);
 
     return gate_contributions;
 }
 
-std::vector<SyncedMemory&> compute_permutation_checks(
+SyncedMemory& compute_permutation_checks(
     int n,
-    SyncedMemory& coset_ntt,
+    Ntt_coset& coset_ntt,
     SyncedMemory& linear_evaluations_evals,
     SyncedMemory& permutations_evals,
     SyncedMemory& wl_eval_8n,
@@ -107,7 +117,8 @@ std::vector<SyncedMemory&> compute_permutation_checks(
     SyncedMemory& z_eval_8n,
     SyncedMemory& alpha,
     SyncedMemory& beta,
-    SyncedMemory& gamma) {
+    SyncedMemory& gamma,
+    ProverKey& pk) {
 
     int size = 8 * n;
 
@@ -115,23 +126,28 @@ std::vector<SyncedMemory&> compute_permutation_checks(
     void* alpha2_gpu_data=alpha2.mutable_gpu_data();
     SyncedMemory& l1_poly_alpha = compute_first_lagrange_poly_scaled(n, alpha2);
     SyncedMemory& l1_alpha_sq_evals = coset_ntt.forward(l1_poly_alpha);
-    l1_poly_alpha.clear();
+    l1_poly_alpha.~SyncedMemory();
 
+
+    SyncedMemory& wl_eval_8n_slice_head=get_head(wl_eval_8n,size);
+    SyncedMemory& wr_eval_8n_slice_head=get_head(wr_eval_8n,size);
+    SyncedMemory& wo_eval_8n_slice_head=get_head(wo_eval_8n,size);
+    SyncedMemory& w4_eval_8n_slice_head=get_head(w4_eval_8n,size);
+    SyncedMemory& z_eval_8n_slice_head=get_head(z_eval_8n,size);
+    SyncedMemory& l1_alpha_sq_evals_slice_head=get_head(l1_alpha_sq_evals,size);
+    SyncedMemory& l1_alpha_sq_evals_slice_tail=get_tail(l1_alpha_sq_evals,size);
     SyncedMemory& quotient = permutation_compute_quotient(
         size,
         linear_evaluations_evals,
-        permutations_evals.left_sigma,
-        permutations_evals.right_sigma,
-        permutations_evals.out_sigma,
-        permutations_evals.fourth_sigma,
-        wl_eval_8n.slice(0, 0, size),
-        wr_eval_8n.slice(0, 0, size),
-        wo_eval_8n.slice(0, 0, size),
-        w4_eval_8n.slice(0, 0, size),
-        z_eval_8n.slice(0, 0, size),
-        z_eval_8n.slice(0, 8),
+        pk,
+        wl_eval_8n_slice_head,
+        wr_eval_8n_slice_head,
+        wo_eval_8n_slice_head,
+        w4_eval_8n_slice_head,
+        z_eval_8n_slice_head,
+        l1_alpha_sq_evals_slice_tail,
         alpha,
-        l1_alpha_sq_evals.slice(0, 0, size),
+        l1_alpha_sq_evals_slice_head,
         beta,
         gamma
     );
@@ -139,9 +155,9 @@ std::vector<SyncedMemory&> compute_permutation_checks(
     return quotient;
 }
 
-std::vector<SyncedMemory&> compute_quotient_poly(
+SyncedMemory& compute_quotient_poly(
     int n,
-    SyncedMemory& pk_new,
+    ProverKey& pk_new,
     SyncedMemory& z_poly,
     SyncedMemory& z2_poly,
     SyncedMemory& w_l_poly,
@@ -171,19 +187,34 @@ std::vector<SyncedMemory&> compute_quotient_poly(
     SyncedMemory& l1_poly = compute_first_lagrange_poly_scaled(n, one);
     Ntt_coset ntt_coset(fr::TWO_ADICITY(),coset_size);
     void* w_l_poly_gpu_data=w_l_poly.mutable_gpu_data();
-    SyncedMemory& wl_eval_8n = ntt_coset::forward(w_l_poly);
-    wl_eval_8n = torch::cat({wl_eval_8n, wl_eval_8n.slice(0, 0, 8)}, 0);
+    void* w_r_poly_gpu_data=w_r_poly.mutable_gpu_data();
+    void* w_o_poly_gpu_data=w_o_poly.mutable_gpu_data();
+    void* w_4_poly_gpu_data=w_4_poly.mutable_gpu_data();
 
-    SyncedMemory& wr_eval_8n = ntt_coset::forward(w_r_poly.to(torch::kCUDA));
-    wr_eval_8n = torch::cat({wr_eval_8n, wr_eval_8n.slice(0, 0, 8)}, 0);
+    SyncedMemory& wl_eval_8n_temp = ntt_coset.forward(w_l_poly);
+    SyncedMemory wl_eval_8n_head(2*sizeof(uint64_t));
+    void* wl_eval_8n_head_gpu_data=wl_eval_8n_head.mutable_gpu_data();
+    void* wl_eval_8n_gpu_data= wl_eval_8n_temp.mutable_gpu_data();
+    caffe_gpu_memcpy(wl_eval_8n_head.size(),wl_eval_8n_gpu_data,wl_eval_8n_head_gpu_data);
+    SyncedMemory& wl_eval_8n = cat(wl_eval_8n_temp,wl_eval_8n_head);
 
-    SyncedMemory& wo_eval_8n = coset_NTT->forward(w_o_poly.to(torch::kCUDA));
+    SyncedMemory wr_eval_8n_temp = ntt_coset.forward(w_r_poly);
+    SyncedMemory wr_eval_8n_head(2*sizeof(uint64_t));
+    void* wr_eval_8n_head_gpu_data=wr_eval_8n_head.mutable_gpu_data();
+    void* wr_eval_8n_temp_gpu_data=wr_eval_8n_temp.mutable_gpu_data();
+    caffe_gpu_memcpy(wr_eval_8n_head.size(),wr_eval_8n_temp_gpu_data,wr_eval_8n_head_gpu_data);
+    SyncedMemory& wr_eval_8n = cat(wr_eval_8n_temp,wr_eval_8n_head);
 
-    SyncedMemory& w4_eval_8n = coset_NTT->forward(w_4_poly.to(torch::kCUDA));
-    w4_eval_8n = torch::cat({w4_eval_8n, w4_eval_8n.slice(0, 0, 8)}, 0);
+    
+    SyncedMemory& wo_eval_8n = ntt_coset.forward(w_o_poly);
+    SyncedMemory& w4_eval_8n_temp = ntt_coset.forward(w_4_poly);
+    SyncedMemory w4_eval_8n_head(2*sizeof(uint64_t));
+    void* w4_eval_8n_head_gpu_data=w4_eval_8n_head.mutable_gpu_data();
+    caffe_gpu_memcpy(w4_eval_8n_head.size(),w4_eval_8n_temp,wr_eval_8n_head_gpu_data);
+    SyncedMemory& w4_eval_8n = cat(w4_eval_8n,w4_eval_8n_head);
 
     SyncedMemory& gate_constraints = compute_gate_constraint_satisfiability(
-        coset_NTT,
+        ntt_coset,
         range_challenge,
         logic_challenge,
         fixed_base_challenge,
@@ -197,13 +228,14 @@ std::vector<SyncedMemory&> compute_quotient_poly(
         public_inputs_poly
     );
     void* z_poly_gpu_data= z_poly.mutable_gpu_data();
-    SyncedMemory& z_eval_8n = coset_NTT->forward(z_poly);
-    z_eval_8n = torch::cat({z_eval_8n, z_eval_8n.slice(0, 0, 8)}, 0);
+    SyncedMemory& z_eval_8n_temp = ntt_coset,forward(z_poly);
+    SyncedMemory& z_eval_8n_head = get_head(z_eval_8n_temp,8);
+    SyncedMemory& z_eval_8n=cat(z_eval_8n_temp,z_eval_8n_head);
 
     SyncedMemory& permutation = compute_permutation_checks(
         n,
         coset_NTT,
-        pk_new.linear_evaluations_evals,
+        pk_new.linear_evaluations,
         pk_new.permutations_evals,
         wl_eval_8n,
         wr_eval_8n,
@@ -215,7 +247,7 @@ std::vector<SyncedMemory&> compute_quotient_poly(
         gamma
     );
 
-    z_eval_8n.reset();
+    z_eval_8n.~SyncedMemory();
 
     void* f_poly_gpu_data= f_poly.mutable_gpu_data();
     void* table_poly_gpu_data= table_poly.mutable_gpu_data();
@@ -239,10 +271,23 @@ std::vector<SyncedMemory&> compute_quotient_poly(
         epsilon,
         zeta,
         lookup_challenge,
-        pk_new.lookups_evals.q_lookup
+        pk_new.q_lookup_evals
     );
 
-    wl_eval_8n.reset();
-    wr_eval_8n.reset();
-    wo_eval_8n.reset();
-    w4_eval_8n.reset
+    wl_eval_8n.~SyncedMemory();
+    wr_eval_8n.~SyncedMemory();
+    wo_eval_8n.~SyncedMemory();
+    w4_eval_8n.~SyncedMemory();
+    SyncedMemory&  numerator_temp_1 = add_mod(gate_constraints, permutation);
+    SyncedMemory&  gate_constraints.~SyncedMemory();
+    SyncedMemory&  permutation.~SyncedMemory();
+    SyncedMemory& numerator_temp_2 = add_mod(numerator_temp_1, lookup);
+    lookup.~SyncedMemory();
+    SyncedMemory& denominator =inv_mod(pk_new.v_h_coset_8n_evals);
+    SyncedMemory& res_temp = mul_mod(numerator_temp_2, denominator);
+    numerator.~SyncedMemory();
+    denominator.~SyncedMemory();
+    Intt_coset intt_coset(fr::TWO_ADICITY());
+    SyncedMemory& res = intt_coset.forward(res_temp);
+    return res;
+    }

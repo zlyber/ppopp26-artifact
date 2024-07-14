@@ -32,6 +32,5 @@ int main(){
     }
     std::cout<<aaa;
     printf("\n");
-    printf("%d",sizeof(BTreeMap&));
     return 0;
 }

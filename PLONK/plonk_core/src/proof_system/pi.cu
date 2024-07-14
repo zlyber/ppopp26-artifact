@@ -6,8 +6,10 @@
 
 SyncedMemory& as_evals(SyncedMemory& public_inputs, int pi_pos, int n) {
     
-    SyncedMemory& pi = torch::zeros({n}, torch::dtype(fr::TYPE()).device(torch::kCPU).requires_grad(false));
-    pi.index_put_({pi_pos}, public_inputs);
+    SyncedMemory& pi = repeat_zero(n);
+    void* pi_gpu_data = pi.mutable_gpu_data();
+    void* public_inputs_data = public_inputs.mutable_gpu_data();
+    caffe_gpu_memcpy(public_inputs.size(), public_inputs_data, pi_gpu_data+pi_pos*sizeof(uint64_t));
     return pi;
 }
 

@@ -31,17 +31,21 @@ SyncedMemory& range_constraints(SyncedMemory& separation_challenge,  WitnessValu
     SyncedMemory& f_b2 = delta(b_2_2);
     SyncedMemory& b_2 = mul_mod(f_b2, kappa);
 
+
+
     
     SyncedMemory& b_3_1 = mul_mod(four, wit_vals.b_val);
     SyncedMemory& b_3_2 = sub_mod(wit_vals.a_val, b_3_1);
     SyncedMemory& f_b3 = delta(b_3_2);
     SyncedMemory& b_3 = mul_mod(f_b3, kappa_sq);
+  
 
    
     SyncedMemory& b_4_1 = mul_mod(four, wit_vals.a_val);
     SyncedMemory& b_4_2 = sub_mod(custom_vals.d_next_eval, b_4_1);
     SyncedMemory& f_b4 = delta(b_4_2);
     SyncedMemory& b_4 = mul_mod(f_b4, kappa_cu);
+   
 
     
     SyncedMemory& mid1 = add_mod(b_1, b_2);
@@ -75,7 +79,8 @@ SyncedMemory& quotient_term(SyncedMemory& selector, SyncedMemory& separation_cha
     SyncedMemory& b_2 = mul_mod_scalar(mid_temp_5, kappa);
 
     SyncedMemory& mid1_temp_1 = add_mod(b_1, b_2);
-    // b_1.reset(); b_2.reset(); 
+    b_1.~SyncedMemory();
+    b_2.~SyncedMemory();
 
     void* kappa_sq_gpu_data=kappa_sq.mutable_gpu_data();
     SyncedMemory& mid_temp_6 = mul_mod_scalar(wit_vals.b_val, four);
@@ -84,7 +89,7 @@ SyncedMemory& quotient_term(SyncedMemory& selector, SyncedMemory& separation_cha
     SyncedMemory& b_3 = mul_mod_scalar(mid_temp_8, kappa_sq);
 
     SyncedMemory& mid1_temp_2 = add_mod(mid1_temp_1, b_3);
-    // b_3.reset(); 
+    b_3.~SyncedMemory();
 
     void* kappa_cu_gpu_data=kappa_cu.mutable_gpu_data();
     SyncedMemory& mid_temp_9 = mul_mod_scalar(wit_vals.a_val, four);
@@ -93,7 +98,7 @@ SyncedMemory& quotient_term(SyncedMemory& selector, SyncedMemory& separation_cha
     SyncedMemory& b_4 = mul_mod_scalar(mid_temp_11, kappa_cu);
 
     SyncedMemory& mid = add_mod(mid1_temp_2, b_4);
-    // b_4.reset(); 
+    b_4.~SyncedMemory();
     void* separation_challenge_gpu_data=separation_challenge.mutable_gpu_data();
     SyncedMemory& temp = mul_mod_scalar(mid, separation_challenge);
 
@@ -101,7 +106,7 @@ SyncedMemory& quotient_term(SyncedMemory& selector, SyncedMemory& separation_cha
     return res;
 }
 
-SyncedMemory& range_linearisation_term(SyncedMemory& selector_poly, SyncedMemory& separation_challenge,  WitnessValues& wit_vals, Custom_class& custom_vals) {
+SyncedMemory& range_linearisation_term(SyncedMemory& selector_poly, SyncedMemory& separation_challenge,  const WitnessValues& wit_vals, Custom_class& custom_vals) {
     SyncedMemory& temp = range_constraints(separation_challenge, wit_vals, custom_vals);
     if (selector_poly.size()/(8*4) == 0) {
         SyncedMemory& res = selector_poly;

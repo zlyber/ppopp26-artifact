@@ -29,11 +29,13 @@ SyncedMemory& delta( SyncedMemory& f) {
     SyncedMemory& f_1 = sub_mod_scalar(f, one);  // f - 1
     SyncedMemory& f_2 = sub_mod_scalar(f, two);  // f - 2
     SyncedMemory& mid_temp = mul_mod(f_1, f_2);  // (f - 1) * (f - 2)
-    // delete f_1,f_2;
+    f_1.~SyncedMemory();
+    f_2.~SyncedMemory();
     void* three_gpu_data=three.mutable_gpu_data();
     SyncedMemory& f_3 = sub_mod_scalar(f, three);  // f - 3
     SyncedMemory& mid = mul_mod(mid_temp, f_3);  // (f - 1) * (f - 2) * (f - 3)
-    // delete f_3;
+    f_3.~SyncedMemory();
+    mid_temp.~SyncedMemory();
 
     SyncedMemory& res = mul_mod(f, mid);  // f * (f - 1) * (f - 2) * (f - 3)
     return res;

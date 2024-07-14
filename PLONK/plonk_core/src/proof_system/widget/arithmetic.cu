@@ -13,7 +13,7 @@
 #include "PLONK/plonk_core/src/constaraint_system/hash.cu"
 #include "PLONK/src/arithmetic.cu"
 #include "PLONK/plonk_core/src/proof_system/widget/mod.cu"
-
+#define Byte_LEN 8
 struct Arith {
     SyncedMemory& q_m;
     SyncedMemory& q_l;
@@ -27,7 +27,7 @@ struct Arith {
     SyncedMemory& q_arith;
 };
 
- SyncedMemory& compute_quotient_i(const Arith& arithmetics_evals, const WitnessValues& wit_vals) {
+ SyncedMemory& compute_quotient_i( Arith& arithmetics_evals,  WitnessValues& wit_vals) {
     SyncedMemory& mult = mul_mod(wit_vals.a_val, wit_vals.b_val);
     SyncedMemory& mult = mul_mod(mult, arithmetics_evals.q_m);
     SyncedMemory& left = mul_mod(wit_vals.a_val, arithmetics_evals.q_l);
@@ -36,28 +36,28 @@ struct Arith {
     SyncedMemory& fourth = mul_mod(wit_vals.d_val, arithmetics_evals.q_4);
 
     SyncedMemory& mid_temp_1 = add_mod(mult, left);
-    // delete left;
+    left.~SyncedMemory();
     SyncedMemory& mid_temp_2 = add_mod(mid_temp_1, right);
-    // delete right;
+    right.~SyncedMemory();
     SyncedMemory& mid_temp_3 = add_mod(mid_temp_2, out);
-    // delete out;
+    out.~SyncedMemory();
     SyncedMemory& mid_temp_4 = add_mod(mid_temp_3, fourth);
-    // delete fourth;
+    fourth.~SyncedMemory();
 
     SyncedMemory& a_high_temp = exp_mod(wit_vals.a_val, SBOX_ALPHA);
     SyncedMemory& a_high = mul_mod(a_high_temp, arithmetics_evals.q_hl);
     SyncedMemory& mid_temp_5 = add_mod(mid_temp_4, a_high);
-    // delete a_high;
+    a_high.~SyncedMemory();
 
     SyncedMemory& b_high_temp = exp_mod(wit_vals.b_val, SBOX_ALPHA);
     SyncedMemory& b_high = mul_mod(b_high_temp, arithmetics_evals.q_hr);
     SyncedMemory& mid_temp_6 = add_mod(mid_temp_5, b_high);
-    // delete b_high;
+    b_high.~SyncedMemory();
 
     SyncedMemory& f_high_temp = exp_mod(wit_vals.d_val, SBOX_ALPHA);
     SyncedMemory& f_high = mul_mod(f_high_temp, arithmetics_evals.q_h4);
     SyncedMemory& mid_temp_7 = add_mod(mid_temp_6, f_high);
-    // delete f_high;
+    f_high.~SyncedMemory();
 
     SyncedMemory& mid = add_mod(mid_temp_7, arithmetics_evals.q_c);
     SyncedMemory& arith_val = mul_mod(mid, arithmetics_evals.q_arith);
@@ -71,7 +71,7 @@ struct Arith {
      SyncedMemory& c_eval,
      SyncedMemory& d_eval,
      SyncedMemory& q_arith_eval,
-    const Arith& prover_key_arithmetic) {
+     Arith& prover_key_arithmetic) {
 
      SyncedMemory& mid1_1 =mul_mod(a_eval, b_eval);
 
@@ -98,4 +98,35 @@ struct Arith {
 
      SyncedMemory& result = poly_mul_const(add8, q_arith_eval);
     return result;
+}
+SyncedMemory& move(SyncedMemory& a_eval){
+    SyncedMemory res(a_eval.size());
+    void* a_eval_gpu_data = a_eval.mutable_gpu_data();
+    void* res_gpu_data = res.mutable_gpu_data();
+    caffe_gpu_memcpy(a_eval.size()-2*Byte_LEN,a_eval_gpu_data+2*Byte_LEN,res_gpu_data);
+    caffe_gpu_memcpy(2*Byte_LEN,a_eval_gpu_data,res_gpu_data);
+    return res;
+}
+SyncedMemory& cat(SyncedMemory& a_eval,SyncedMemory& b_eval){
+    SyncedMemory res(a_eval.size());
+    void* a_eval_gpu_data = a_eval.mutable_gpu_data();
+    void* b_eval_gpu_data = b_eval.mutable_gpu_data();
+    void* res_gpu_data = res.mutable_gpu_data();
+    caffe_gpu_memcpy(a_eval.size(),a_eval_gpu_data,res_gpu_data);
+    caffe_gpu_memcpy(b_eval.size(),b_eval_gpu_data,res_gpu_data);
+    return res;
+}
+SyncedMemory& get_tail(SyncedMemory& a_eval,int size){
+    SyncedMemory a_eval_tail(a_eval.size()-(size/4*sizeof(uint64_t)));
+    void* a_eval_tail_gpu_data=a_eval_tail.mutable_gpu_data();
+    void* a_eval_gpu_data=a_eval.mutable_gpu_data();
+    caffe_gpu_memcpy(a_eval.size()-(size/4*sizeof(uint64_t)),a_eval_gpu_data,a_eval_tail_gpu_data);
+    return a_eval_tail;
+}
+SyncedMemory& get_head(SyncedMemory& a_eval,int size){
+    SyncedMemory a_eval_head(a_eval.size()-(size/4*sizeof(uint64_t)));
+    void* a_eval_head_gpu_data=a_eval_head.mutable_gpu_data();
+    void* a_eval_gpu_data=a_eval.mutable_gpu_data();
+    caffe_gpu_memcpy(size/4*sizeof(uint64_t),a_eval_gpu_data,a_eval_head_gpu_data);
+    return a_eval_head;
 }

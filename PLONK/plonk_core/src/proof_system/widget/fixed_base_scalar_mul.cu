@@ -121,7 +121,7 @@ SyncedMemory& FBSMGate_quotient_term( SyncedMemory& selector,SyncedMemory& separ
     SyncedMemory& y_alpha_temp_1 = sub_mod_scalar(custom_vals.q_r_val, one);
     SyncedMemory& bit2 = mul_mod(bit, bit);
     SyncedMemory& y_alpha_temp_2 = mul_mod(bit2, y_alpha_temp_1);
-    // bit2.reset();
+    bit2.~SyncedMemory();
     SyncedMemory& y_alpha = add_mod_scalar(y_alpha_temp_2, one);
     SyncedMemory& x_alpha = mul_mod(custom_vals.q_l_val, bit);
 
@@ -132,26 +132,29 @@ SyncedMemory& FBSMGate_quotient_term( SyncedMemory& selector,SyncedMemory& separ
     void* coeff_d_gpu_data =coeff_d.mutable_gpu_data();
     SyncedMemory& mid_temp_4 = mul_mod_scalar(mid_temp_3, coeff_d);
     SyncedMemory& lhs_x = add_mod(custom_vals.a_next_val, mid_temp_4);
-    // mid.reset();
+    mid_temp_1.~SyncedMemory();
+    mid_temp_2.~SyncedMemory();
+    mid_temp_3.~SyncedMemory();
+    mid_temp_4.~SyncedMemory();
 
     SyncedMemory& rhs_x_temp = mul_mod(x_alpha, wit_vals.b_val);
     SyncedMemory& y_alpha_times_acc_x = mul_mod(y_alpha, wit_vals.a_val);
     SyncedMemory& rhs_x = add_mod(rhs_x_temp, y_alpha_times_acc_x);
     SyncedMemory& rhs_y = mul_mod(y_alpha, wit_vals.b_val);
-    // y_alpha.reset();
-    // y_alpha_times_acc_x.reset();
+    y_alpha.~SyncedMemory();
+    y_alpha_times_acc_x.~SyncedMemory();
 
     SyncedMemory& x_acc_consistency_temp = sub_mod(lhs_x, rhs_x);
-    // lhs_x.reset();
-    // rhs_x.reset();
+    lhs_x.~SyncedMemory();
+    rhs_x.~SyncedMemory();
     void* kappa_sq_gpu_data=kappa_sq.mutable_gpu_data();
     SyncedMemory& x_acc_consistency = mul_mod_scalar(x_acc_consistency_temp, kappa_sq);
     SyncedMemory& bit_consistency = check_bit_consistency(bit, one);
     SyncedMemory& mid1_temp_1 = add_mod(bit_consistency, x_acc_consistency);
     SyncedMemory& xy_consistency_temp_1 = mul_mod(bit, custom_vals.q_c_val);
-    // x_acc_consistency.reset();
-    // bit.reset();
-    // bit_consistency.reset();
+    x_acc_consistency.~SyncedMemory();
+    bit.~SyncedMemory();
+    bit_consistency.~SyncedMemory();
 
     SyncedMemory& mid2_temp_1 = mul_mod(custom_vals.b_next_val, wit_vals.c_val);
     SyncedMemory& mid2_temp_2 = mul_mod(mid2_temp_1, wit_vals.a_val);
@@ -161,15 +164,19 @@ SyncedMemory& FBSMGate_quotient_term( SyncedMemory& selector,SyncedMemory& separ
     SyncedMemory& coeff_a = COEFF_A();
     void* coeff_a_gpu_data = coeff_a.mutable_gpu_data();
     SyncedMemory& mid3_temp_1 = mul_mod_scalar(x_alpha, coeff_a);
-    // x_alpha.reset();
+    x_alpha.~SyncedMemory();
+    mid2_temp_1.~SyncedMemory();
+    mid2_temp_2.~SyncedMemory();
+    mid2_temp_3.~SyncedMemory();
 
     SyncedMemory& mid3 = mul_mod(mid3_temp_1, wit_vals.a_val);
     SyncedMemory& rhs_y = sub_mod(rhs_y, mid3);
-    // mid.reset();
+    mid.~SyncedMemory();
+    mid3.~SyncedMemory();
 
     SyncedMemory& y_acc_consistency_temp = sub_mod(lhs_y, rhs_y);
-    // lhs_y.reset();
-    // rhs_y.reset();
+    lhs_y.~SyncedMemory();
+    rhs_y.~SyncedMemory();
     void* kappa_cu_gpu_data=kappa_cu.mutable_gpu_data();
     void* kappa_gpu_data=kappa.mutable_gpu_data();
     SyncedMemory& y_acc_consistency = mul_mod_scalar(y_acc_consistency_temp, kappa_cu);
@@ -177,9 +184,10 @@ SyncedMemory& FBSMGate_quotient_term( SyncedMemory& selector,SyncedMemory& separ
     SyncedMemory& xy_consistency = mul_mod_scalar(xy_consistency_temp_2, kappa);
     SyncedMemory& mid1_temp_2 = add_mod(mid1_temp_1, y_acc_consistency);
     SyncedMemory& res_temp_1 = add_mod(mid1_temp_2, xy_consistency);
-    // mid1.reset();
-    // y_acc_consistency.reset();
-    // xy_consistency.reset();
+    mid1_temp_1.~SyncedMemory();
+    mid1_temp_2.~SyncedMemory();
+    y_acc_consistency.~SyncedMemory();
+    xy_consistency.~SyncedMemory();
     void* separation_challenge_gpu_data=separation_challenge.mutable_gpu_data();
     SyncedMemory& res_temp_2 = mul_mod_scalar(res_temp_1, separation_challenge);
     SyncedMemory& res = mul_mod(selector, res_temp_2);
@@ -187,7 +195,7 @@ SyncedMemory& FBSMGate_quotient_term( SyncedMemory& selector,SyncedMemory& separ
     }
 
 SyncedMemory& FBSMGate_linearisation_term(SyncedMemory&selector_poly, SyncedMemory& separation_challenge, WitnessValues&wit_vals, FBSMValues&custom_vals) {    
-        SyncedMemory&temp = FBSMGate::constraints(separation_challenge, wit_vals, custom_vals);
+        SyncedMemory&temp = FBSMGate_constraints(separation_challenge, wit_vals, custom_vals);
         SyncedMemory&res = poly_mul_const(selector_poly, temp);
         return res;
     }

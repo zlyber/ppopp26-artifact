@@ -19,7 +19,7 @@ SyncedMemory& compute_quotient_identity_range_check_i(
     SyncedMemory& k2 = K2();
     SyncedMemory& k3 = K3();
 
-    // 单个标量操作在 CPU 上
+   
     SyncedMemory& mid2 = mul_mod(beta, k1);
     SyncedMemory& mid3 = mul_mod(beta, k2);
     SyncedMemory& mid4 = mul_mod(beta, k3);
@@ -38,21 +38,24 @@ SyncedMemory& compute_quotient_identity_range_check_i(
     SyncedMemory& mid2 = add_mod_scalar(mid2, gamma);
 
     SyncedMemory& mid = mul_mod(mid1, mid2);
-    // delete mid1, mid2;
+    mid1.~SyncedMemory();
+    mid2.~SyncedMemory();
 
     void* mid3_gpu_data= mid3.mutable_gpu_data();
     SyncedMemory& mid3 = mul_mod_scalar(x, mid3);
     SyncedMemory& mid3 = add_mod(w_o_i, mid3);
     SyncedMemory& mid3 = add_mod_scalar(mid3, gamma);
     SyncedMemory& mid = mul_mod(mid, mid3);
-    // delete mid3;
+    mid3.~SyncedMemory();
+
+
 
     void* mid4_gpu_data= mid4.mutable_gpu_data();
     SyncedMemory& mid4 = mul_mod_scalar(x, mid4);
     SyncedMemory& mid4 = add_mod(w_4_i, mid4);
     SyncedMemory& mid4 = add_mod_scalar(mid4, gamma);
     SyncedMemory& mid = mul_mod(mid, mid4);
-    // delete mid4;
+    mid4.~SyncedMemory();
 
     SyncedMemory& res = mul_mod(mid, z_i);
     SyncedMemory& res = mul_mod_scalar(res, alpha);
@@ -92,21 +95,21 @@ SyncedMemory& compute_quotient_copy_range_check_i(
     SyncedMemory& mid2 =  add_mod_scalar(mid2_temp_2, gamma);
 
     SyncedMemory& res_temp_1 =  mul_mod(mid1, mid2);
-    // delete mid1;
-    // delete mid2;
+    mid1.~SyncedMemory();
+    mid2.~SyncedMemory();
 
     SyncedMemory& mid3_temp_1 =  mul_mod_scalar(pk_out_sigma_evals, beta);
     SyncedMemory& mid3_temp_2 =  add_mod(w_o_i, mid3_temp_1);
     SyncedMemory& mid3 =  add_mod_scalar(mid3_temp_2, gamma);
     SyncedMemory& res_temp_2 =  mul_mod(res_temp_1, mid3);
-    // delete mid3;
+    mid3.~SyncedMemory();
 
     SyncedMemory& mid4_temp_1 =  mul_mod_scalar(pk_fourth_sigma_evals, beta);
     SyncedMemory& mid4_temp_2 =  add_mod(w_4_i, mid4_temp_1);
     SyncedMemory& mid4 =  add_mod_scalar(mid4_temp_2, gamma);
 
     SyncedMemory& res_temp_3 =  mul_mod(res_temp_2, mid4);
-    // delete mid4;
+    mid4.~SyncedMemory();
     SyncedMemory& res_temp_4 =  mul_mod(res_temp_3, z_i_next);
     SyncedMemory& res =  mul_mod_scalar(res_temp_4, alpha);
     
@@ -232,7 +235,7 @@ SyncedMemory& compute_lineariser_copy_range_check(
 
     // b_eval + beta * sigma_2 + gamma
     SyncedMemory&beta_sigma_2 = mul_mod(beta, sigma_2_eval);
-    SyncedMemory&a_1_temp = add_mod(b_eval, beta_sigma_2);
+    SyncedMemory& a_1_temp = add_mod(b_eval, beta_sigma_2);
     SyncedMemory& a_1 = add_mod(a_1_temp, gamma);
 
     // c_eval + beta * sigma_3 + gamma
@@ -264,34 +267,27 @@ SyncedMemory& compute_lineariser_check_is_one(
     caffe_gpu_memcpy(5 * sizeof(uint64_t), lagrange_coefficients_gpu_data, l_1_z_gpu_data);
     SyncedMemory& const_num =mul_mod(l_1_z, alpha_sq);
     SyncedMemory& res = poly_mul_const(z_coeffs, const_num);
-    
-
     return res;
 }
 
  SyncedMemory& permutation_compute_quotient(
          int size,
-         SyncedMemory& pk_linear_evaluations_evals,
-         SyncedMemory& pk_left_sigma_evals,
-         SyncedMemory& pk_right_sigma_evals,
-         SyncedMemory& pk_out_sigma_evals,
-         SyncedMemory& pk_fourth_sigma_evals,
+         ProverKey& pk,
          SyncedMemory& w_l_i,  SyncedMemory& w_r_i,  SyncedMemory& w_o_i,  SyncedMemory& w_4_i,
          SyncedMemory& z_i,  SyncedMemory& z_i_next,
          SyncedMemory& alpha,  SyncedMemory& l1_alpha_sq,
-         SyncedMemory& beta,  SyncedMemory& gamma) 
-{
+         SyncedMemory& beta,  SyncedMemory& gamma) {
 
         SyncedMemory& a = compute_quotient_identity_range_check_i(
-          pk_linear_evaluations_evals, w_l_i, w_r_i, w_o_i, w_4_i, z_i, alpha, beta, gamma
+          pk.linear_evaluations, w_l_i, w_r_i, w_o_i, w_4_i, z_i, alpha, beta, gamma
         );
 
         SyncedMemory& b = compute_quotient_copy_range_check_i(
             size,
-            pk_left_sigma_evals,
-            pk_right_sigma_evals,
-            pk_out_sigma_evals,
-            pk_fourth_sigma_evals,  w_l_i, w_r_i, w_o_i, w_4_i, z_i_next, alpha, beta, gamma
+            pk.permutation_evals.left_sigma,
+            pk.permutation_evals.right_sigma,
+            pk.permutation_evals.out_sigma,
+            pk.permutation_evals.fourth_sigma,  w_l_i, w_r_i, w_o_i, w_4_i, z_i_next, alpha, beta, gamma
         );
 
         SyncedMemory& c = compute_quotient_term_check_one_i(z_i, l1_alpha_sq);

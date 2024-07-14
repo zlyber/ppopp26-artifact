@@ -13,6 +13,15 @@
 #include "PLONK/plonk_core/src/proof_system/widget/logic.cu"
 #include "PLONK/plonk_core/src/proof_system/widget/fixed_base_scalar_mul.cu"
 #include "PLONK/plonk_core/src/proof_system/widget/arithmetic.cu"
+#include "PLONK/plonk_core/src/proof_system/permutation.cu"
+struct Linearisation_poly {
+    SyncedMemory& a;
+    ProofEvaluations & proof_eval;
+        // Constructor
+    Linearisation_poly(SyncedMemory& a, ProofEvaluations& proof_eval)
+        : a(a), proof_eval(proof_eval) {}
+
+};
 class WireEvaluations {
 public:
     SyncedMemory& a_eval;
@@ -98,7 +107,7 @@ std::tuple<SyncedMemory&, ProofEvaluations> compute_linearisation_poly(
 ) {
     int n = domain.size;
     SyncedMemory& omega = domain.group_gen;
-    SyncedMemory& domain_permutation = Radix2EvaluationDomain::new_domain(n);
+    Radix2EvaluationDomain domain_permutation(n);
     
     
     SyncedMemory& one = fr::one();
@@ -143,9 +152,9 @@ std::tuple<SyncedMemory&, ProofEvaluations> compute_linearisation_poly(
 
     WireEvaluations wire_evals(a_eval, b_eval, c_eval, d_eval);
 
-    SyncedMemory& left_sigma_eval = evaluate(pk.left_sigma_coeffs, z_challenge);
-    SyncedMemory& right_sigma_eval = evaluate(pk.right_sigma_coeffs, z_challenge);
-    SyncedMemory& out_sigma_eval = evaluate(pk.out_sigma_coeffs, z_challenge);
+    SyncedMemory& left_sigma_eval = evaluate(pk.permutation_coeffs.left_sigma, z_challenge);
+    SyncedMemory& right_sigma_eval = evaluate(pk.permutation_coeffs.right_sigma, z_challenge);
+    SyncedMemory& out_sigma_eval = evaluate(pk.permutation_coeffs.out_sigma, z_challenge);
     SyncedMemory& permutation_eval = evaluate(z_poly, shifted_z_challenge);
 
     PermutationEvaluations perm_evals(
@@ -153,19 +162,19 @@ std::tuple<SyncedMemory&, ProofEvaluations> compute_linearisation_poly(
     );
 
   
-    SyncedMemory& q_arith_eval = evaluate(pk.q_arith_coeffs, z_challenge);
-    SyncedMemory& q_lookup_eval = evaluate(pk.q_lookup_coeffs, z_challenge);
-    SyncedMemory& q_c_eval = evaluate(pk.q_c_coeffs, z_challenge);
-    SyncedMemory& q_l_eval = evaluate(pk.q_l_coeffs, z_challenge);
-    SyncedMemory& q_r_eval = evaluate(pk.q_r_coeffs, z_challenge);
+    SyncedMemory& q_arith_eval = evaluate(pk.arithmetic_coeffs.q_arith, z_challenge);
+    SyncedMemory& q_lookup_eval = evaluate(pk.lookup_coeffs.q_lookup, z_challenge);
+    SyncedMemory& q_c_eval = evaluate(pk.arithmetic_coeffs.q_c, z_challenge);
+    SyncedMemory& q_l_eval = evaluate(pk.arithmetic_coeffs.q_l, z_challenge);
+    SyncedMemory& q_r_eval = evaluate(pk.arithmetic_coeffs.q_r, z_challenge);
     SyncedMemory& a_next_eval = evaluate(w_l_poly, shifted_z_challenge);
     SyncedMemory& b_next_eval = evaluate(w_r_poly, shifted_z_challenge);
     SyncedMemory& d_next_eval = evaluate(w_4_poly, shifted_z_challenge);
 
 
-    SyncedMemory& q_hl_eval = evaluate(pk.q_hl_coeffs, z_challenge);
-    SyncedMemory& q_hr_eval = evaluate(pk.q_hr_coeffs, z_challenge);
-    SyncedMemory& q_h4_eval = evaluate(pk.q_h4_coeffs, z_challenge);
+    SyncedMemory& q_hl_eval = evaluate(pk.arithmetic_coeffs.q_hl, z_challenge);
+    SyncedMemory& q_hr_eval = evaluate(pk.arithmetic_coeffs.q_hr, z_challenge);
+    SyncedMemory& q_h4_eval = evaluate(pk.arithmetic_coeffs.q_4, z_challenge);
 
     Custom_class custom_evals(q_arith_eval, q_lookup_eval, q_c_eval, q_l_eval, q_r_eval, q_hl_eval, q_hr_eval, q_h4_eval, a_next_eval, b_next_eval, d_next_eval);
 
@@ -223,20 +232,24 @@ std::tuple<SyncedMemory&, ProofEvaluations> compute_linearisation_poly(
         z2_poly,
         h1_poly,
         lookup_separation_challenge,
-        pk.q_lookup_coeffs
+        pk.lookup_coeffs.q_lookup
     );
     void* alpha_gpu_data = alpha.mutable_gpu_data();
     void* beta_gpu_data = beta.mutable_gpu_data();
     void* gamma_gpu_data = gamma.mutable_gpu_data();
+    
+    vector<SyncedMemory&> challengTuple={alpha, beta, gamma};
+    vector<SyncedMemory&> wireTuple={a_eval, b_eval, c_eval, d_eval};
+    vector<SyncedMemory&> sigmaTuple={left_sigma_eval, right_sigma_eval, out_sigma_eval};
     SyncedMemory& permutation = compute_linearisation_permutation(
         z_challenge,
-        std::make_tuple(alpha, beta, gamma),
-        std::make_tuple(a_eval, b_eval, c_eval, d_eval),
-        std::make_tuple(left_sigma_eval, right_sigma_eval, out_sigma_eval),
+        challengTuple,
+        wireTuple,
+        sigmaTuple,
         permutation_eval,
         z_poly,
         domain_permutation,
-        pk.fourth_sigma_coeffs
+        pk.permutation_coeffs.fourth_sigma
     );
 
     void* z_challenge_to_n_gpu_data = z_challenge_to_n.mutable_gpu_data();
@@ -313,7 +326,7 @@ SyncedMemory& compute_gate_constraint_satisfiability(
         wire_evals.c_eval,
         wire_evals.d_eval,
         q_arith_eval,
-        prover_key_arithmetic
+        pk
     );
 
     
