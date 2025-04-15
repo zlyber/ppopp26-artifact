@@ -4,9 +4,7 @@
 class SWFlags {
 public:
     static const int BIT_SIZE = 2;
-    static const int Infinity = 0;
-    static const int PositiveY = 1;
-    static const int NegativeY = 2;
+    enum flags { Infinity, PositiveY, NegativeY };
 
     int flag;
 
@@ -37,9 +35,10 @@ public:
 
 class EmptyFlags {
 public:
+    int flag;
     static const int BIT_SIZE = 0;
-
-    static uint8_t u8_bitmask() {
+    EmptyFlags(int flags): flag(flags) {}
+    uint8_t u8_bitmask() {
         return 0;
     }
 };

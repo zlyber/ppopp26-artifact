@@ -1,4 +1,4 @@
-#include "PLONK/src/transcript/strobe.h"
+#include "strobe.h"
 
 
 
@@ -72,7 +72,7 @@ void keccak_p(uint64_t* state, int round_count) {
 }
 
 
-Strobe128 Strobe128::new_instance(char* protocol_label) {
+Strobe128 Strobe128::new_instance(std::string protocol_label) {
     Strobe128 strobe;
     memset(strobe.state, 0, 200);
     strobe.state[0] = 1;
@@ -91,7 +91,8 @@ Strobe128 Strobe128::new_instance(char* protocol_label) {
     strobe.pos = 0;
     strobe.pos_begin = 0;
     strobe.cur_flags = 0;
-    strobe.meta_ad(protocol_label, false);
+    std::vector<uint8_t> data = str_to_u8(protocol_label);
+    strobe.meta_ad(data, false);
 
     return strobe;
 }
@@ -110,8 +111,8 @@ void Strobe128::run_f() {
     pos_begin = 0;
 }
 
-void Strobe128::absorb(uint8_t* data, size_t data_len) {
-    for (size_t i = 0; i < data_len; ++i) {
+void Strobe128::absorb(std::vector<uint8_t>& data) {
+    for (size_t i = 0; i < data.size(); ++i) {
         state[pos] ^= data[i];
         pos += 1;
         if (pos == STROBE_R) {
@@ -120,8 +121,8 @@ void Strobe128::absorb(uint8_t* data, size_t data_len) {
     }
 }
 
-void Strobe128::squeeze(uint8_t* data, size_t data_len) {
-    for (size_t i = 0; i < data_len; ++i) {
+void Strobe128::squeeze(std::vector<uint8_t>& data) {
+    for (size_t i = 0; i < data.size(); ++i) {
         data[i] = state[pos];
         state[pos] = 0;
         pos += 1;
@@ -143,8 +144,8 @@ void Strobe128::begin_op(int flags, bool more) {
     pos_begin = pos + 1;
     cur_flags = flags;
 
-    uint8_t absorb_data[] = { static_cast<uint8_t>(old_begin), static_cast<uint8_t>(flags) };
-    absorb(absorb_data, sizeof(absorb_data));
+    std::vector<uint8_t> absorb_data = { (uint8_t)old_begin, (uint8_t)flags };
+    absorb(absorb_data);
 
     bool force_f = (flags & (FLAG_C | FLAG_K)) != 0;
 
@@ -153,18 +154,26 @@ void Strobe128::begin_op(int flags, bool more) {
     }
 }
 
-void Strobe128::meta_ad(char* data, bool more) {
+void Strobe128::meta_ad(std::vector<uint8_t>& data, bool more) {
     begin_op(FLAG_M | FLAG_A, more);
-    absorb(reinterpret_cast<uint8_t*>(data), strlen(data));
+    absorb(data);
 }
 
-void Strobe128::ad(char* data, bool more) {
+void Strobe128::ad(std::vector<uint8_t>& data, bool more) {
     begin_op(FLAG_A, more);
-    absorb(reinterpret_cast<uint8_t*>(data), strlen(data));
+    absorb(data);
 }
 
-void Strobe128::prf(uint8_t* data, size_t data_len, bool more) {
+void Strobe128::prf(std::vector<uint8_t>& data, bool more) {
     int flags = FLAG_I | FLAG_A | FLAG_C;
     begin_op(flags, more);
-    squeeze(data, data_len);
+    squeeze(data);
+}
+
+std::vector<uint8_t> str_to_u8(std::string str) {
+    std::vector<uint8_t> uint8_array(str.size());
+
+    std::memcpy(uint8_array.data(), str.data(), str.size());
+
+    return uint8_array;
 }

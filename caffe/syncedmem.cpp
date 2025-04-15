@@ -1,10 +1,7 @@
-#include "common.hpp"
 #include "syncedmem.hpp"
-#include "utils/math_functions.hpp"
-
 
 namespace caffe {
-SyncedMemory::SyncedMemory()
+SyncedMemorykernel::SyncedMemorykernel()
   : cpu_ptr_(NULL), gpu_ptr_(NULL), size_(0), head_(UNINITIALIZED),
     own_cpu_data_(false), cpu_malloc_use_cuda_(false), own_gpu_data_(false) {
 #ifndef CPU_ONLY
@@ -14,7 +11,7 @@ SyncedMemory::SyncedMemory()
 #endif
 }
 
-SyncedMemory::SyncedMemory(size_t size)
+SyncedMemorykernel::SyncedMemorykernel(size_t size)
   : cpu_ptr_(NULL), gpu_ptr_(NULL), size_(size), head_(UNINITIALIZED),
     own_cpu_data_(false), cpu_malloc_use_cuda_(false), own_gpu_data_(false) {
 #ifndef CPU_ONLY
@@ -24,7 +21,7 @@ SyncedMemory::SyncedMemory(size_t size)
 #endif
 }
 
-SyncedMemory::~SyncedMemory() {
+SyncedMemorykernel::~SyncedMemorykernel() {
   check_device();
   if (cpu_ptr_ && own_cpu_data_) {
     CaffeFreeHost(cpu_ptr_, cpu_malloc_use_cuda_);
@@ -37,7 +34,7 @@ SyncedMemory::~SyncedMemory() {
 #endif  // CPU_ONLY
 }
 
-inline void SyncedMemory::to_cpu() {
+inline void SyncedMemorykernel::to_cpu() {
   check_device();
   switch (head_) {
   case UNINITIALIZED:
@@ -64,7 +61,35 @@ inline void SyncedMemory::to_cpu() {
   }
 }
 
-inline void SyncedMemory::to_gpu() {
+
+inline void SyncedMemorykernel::to_cpu_async(cudaStream_t stream) {
+  check_device();
+  switch (head_) {
+  case UNINITIALIZED:
+    CaffeMallocHost(&cpu_ptr_, size_, &cpu_malloc_use_cuda_);
+    caffe_memset(size_, 0, cpu_ptr_);
+    head_ = HEAD_AT_CPU;
+    own_cpu_data_ = true;
+    break;
+  case HEAD_AT_GPU:
+#ifndef CPU_ONLY
+    if (cpu_ptr_ == NULL) {
+      CaffeMallocHost(&cpu_ptr_, size_, &cpu_malloc_use_cuda_);
+      own_cpu_data_ = true;
+    }
+    caffe_gpu_memcpy_async(size_, gpu_ptr_, cpu_ptr_, stream);
+    head_ = SYNCED;
+#else
+    NO_GPU;
+#endif
+    break;
+  case HEAD_AT_CPU:
+  case SYNCED:
+    break;
+  }
+}
+
+inline void SyncedMemorykernel::to_gpu() {
   check_device();
 #ifndef CPU_ONLY
   switch (head_) {
@@ -91,13 +116,41 @@ inline void SyncedMemory::to_gpu() {
 #endif
 }
 
-const void* SyncedMemory::cpu_data() {
+
+inline void SyncedMemorykernel::to_gpu_async(cudaStream_t stream) {
+  check_device();
+#ifndef CPU_ONLY
+  switch (head_) {
+  case UNINITIALIZED:
+    CUDA_CHECK(cudaMalloc(&gpu_ptr_, size_));
+    caffe_gpu_memset_async(size_, 0, gpu_ptr_, stream);
+    head_ = HEAD_AT_GPU;
+    own_gpu_data_ = true;
+    break;
+  case HEAD_AT_CPU:
+    if (gpu_ptr_ == NULL) {
+      CUDA_CHECK(cudaMalloc(&gpu_ptr_, size_));
+      own_gpu_data_ = true;
+    }
+    caffe_gpu_memcpy_async(size_, cpu_ptr_, gpu_ptr_, stream);
+    head_ = SYNCED;
+    break;
+  case HEAD_AT_GPU:
+  case SYNCED:
+    break;
+  }
+#else
+  NO_GPU;
+#endif
+}
+
+const void* SyncedMemorykernel::cpu_data() {
   check_device();
   to_cpu();
   return (const void*)cpu_ptr_;
 }
 
-void SyncedMemory::set_cpu_data(void* data) {
+void SyncedMemorykernel::set_cpu_data(void* data) {
   check_device();
   if (own_cpu_data_) {
     CaffeFreeHost(cpu_ptr_, cpu_malloc_use_cuda_);
@@ -107,7 +160,7 @@ void SyncedMemory::set_cpu_data(void* data) {
   own_cpu_data_ = false;
 }
 
-const void* SyncedMemory::gpu_data() {
+const void* SyncedMemorykernel::gpu_data() {
   check_device();
 #ifndef CPU_ONLY
   to_gpu();
@@ -118,7 +171,7 @@ const void* SyncedMemory::gpu_data() {
 #endif
 }
 
-void SyncedMemory::set_gpu_data(void* data) {
+void SyncedMemorykernel::set_gpu_data(void* data) {
   check_device();
 #ifndef CPU_ONLY
   if (own_gpu_data_) {
@@ -132,14 +185,21 @@ void SyncedMemory::set_gpu_data(void* data) {
 #endif
 }
 
-void* SyncedMemory::mutable_cpu_data() {
+void* SyncedMemorykernel::mutable_cpu_data() {
   check_device();
   to_cpu();
   head_ = HEAD_AT_CPU;
   return cpu_ptr_;
 }
 
-void* SyncedMemory::mutable_gpu_data() {
+void* SyncedMemorykernel::mutable_cpu_data_async(cudaStream_t stream) {
+  check_device();
+  to_cpu_async(stream);
+  head_ = HEAD_AT_CPU;
+  return cpu_ptr_;
+}
+
+void* SyncedMemorykernel::mutable_gpu_data() {
   check_device();
 #ifndef CPU_ONLY
   to_gpu();
@@ -151,8 +211,20 @@ void* SyncedMemory::mutable_gpu_data() {
 #endif
 }
 
+void* SyncedMemorykernel::mutable_gpu_data_async(cudaStream_t stream) {
+  check_device();
 #ifndef CPU_ONLY
-void SyncedMemory::async_gpu_push(const cudaStream_t& stream) {
+  to_gpu_async(stream);
+  head_ = HEAD_AT_GPU;
+  return gpu_ptr_;
+#else
+  NO_GPU;
+  return NULL;
+#endif
+}
+
+#ifndef CPU_ONLY
+void SyncedMemorykernel::async_gpu_push(const cudaStream_t& stream) {
   check_device();
   if (gpu_ptr_ == NULL) {
     CUDA_CHECK(cudaMalloc(&gpu_ptr_, size_));
@@ -165,7 +237,7 @@ void SyncedMemory::async_gpu_push(const cudaStream_t& stream) {
 }
 #endif
 
-void SyncedMemory::check_device() {
+void SyncedMemorykernel::check_device() {
 #ifndef CPU_ONLY
 #ifdef DEBUG
   int device;

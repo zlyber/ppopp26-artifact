@@ -17,6 +17,9 @@ inline void CaffeMallocHost(void** ptr, size_t size, bool* use_cuda) {
     return;
 #endif
   *ptr = malloc(size);
+  // if(ptr == nullptr){
+  //   std::cout<< "null pointer" << std::endl;
+  // }
   *use_cuda = false;
 }
 
@@ -41,17 +44,20 @@ inline void CaffeFreeHost(void* ptr, bool use_cuda) {
  *
  * TODO(dox): more thorough description.
  */
-class SyncedMemory {
+class SyncedMemorykernel
+{
  public:
-  SyncedMemory();
-  explicit SyncedMemory(size_t size);
-  ~SyncedMemory();
+  SyncedMemorykernel();
+  explicit SyncedMemorykernel(size_t size);
+  ~SyncedMemorykernel();
   const void* cpu_data();
   void set_cpu_data(void* data);
   const void* gpu_data();
   void set_gpu_data(void* data);
   void* mutable_cpu_data();
+  void* mutable_cpu_data_async(cudaStream_t stream);
   void* mutable_gpu_data();
+  void* mutable_gpu_data_async(cudaStream_t stream);
   enum SyncedHead { UNINITIALIZED, HEAD_AT_CPU, HEAD_AT_GPU, SYNCED };
   SyncedHead head() const { return head_; }
   size_t size() const { return size_; }
@@ -63,7 +69,9 @@ class SyncedMemory {
  private:
   void check_device();
   void to_cpu();
+  void to_cpu_async(cudaStream_t stream = (cudaStream_t)0);
   void to_gpu();
+  void to_gpu_async(cudaStream_t stream = (cudaStream_t)0);
   void* cpu_ptr_;
   void* gpu_ptr_;
   size_t size_;
@@ -73,8 +81,8 @@ class SyncedMemory {
   bool own_gpu_data_;
   int device_;
 public:
-  SyncedMemory(const SyncedMemory&) = delete;
-  SyncedMemory& operator=(const SyncedMemory&) = delete;
-};  // class SyncedMemory
+  SyncedMemorykernel(const SyncedMemorykernel&) = delete;
+  SyncedMemorykernel& operator=(const SyncedMemorykernel&) = delete;
+};  // class SyncedMemorykernel
 
 }  // namespace caffe

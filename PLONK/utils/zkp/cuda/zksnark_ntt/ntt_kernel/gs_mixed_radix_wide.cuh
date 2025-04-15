@@ -1,6 +1,6 @@
 #pragma once
 
-#include "PLONK/utils/zkp/cuda/zksnark_ntt/ntt_kernel/kernels.cuh"
+#include "kernels.cuh"
 
 namespace cuda{
 template <int intermediate_mul, typename fr_t>

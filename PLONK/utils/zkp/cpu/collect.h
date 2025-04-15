@@ -22,8 +22,8 @@
 #include <cstdio>
 #include <iostream>
 #include <vector>
-#include "PLONK/utils/zkp/cpu/ec/jacobian_t.hpp"
-#include "PLONK/utils/zkp/cpu/ec/xyzz_t.hpp"
+#include "ec/jacobian_t.hpp"
+#include "ec/xyzz_t.hpp"
 
 #ifndef WARP_SZ
 #define WARP_SZ 32

@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "caffe/common.hpp"
+#include "../common.hpp"
 
 
 namespace caffe {
@@ -25,5 +25,14 @@ inline void caffe_gpu_memset(const size_t N, const int alpha, void* X) {
 #endif
 }
 
+inline void caffe_gpu_memset_async(const size_t N, const int alpha, void* X, cudaStream_t stream = (cudaStream_t)0) {
+#ifndef CPU_ONLY
+  CUDA_CHECK(cudaMemsetAsync(X, alpha, N, stream));  // NOLINT(caffe/alt_fn)
+#else
+  NO_GPU;
+#endif
+}
+
+void caffe_gpu_memcpy_async(const size_t N, const void* X, void* Y, cudaStream_t stream = (cudaStream_t)0);
 }
 

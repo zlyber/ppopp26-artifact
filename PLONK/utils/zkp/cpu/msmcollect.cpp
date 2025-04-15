@@ -1,4 +1,4 @@
-#include "msmcollect.h"
+#include "msmcollect.hpp"
 #pragma clang diagnostic ignored "-Wmissing-prototypes"
 namespace cpu{
   
@@ -31,12 +31,12 @@ namespace cpu{
       msm_collect.collect(self_ptr, res_ptr, ones_ptr, lenofone);
   }
 
-  SyncedMemory& msm_collect_cpu(SyncedMemory& step1res, int64_t npoints) {
-    SyncedMemory out(3 * fq_LIMBS);
-    void* out_gpu = out.mutable_gpu_data();
-    void* step1res_gpu = step1res.mutable_gpu_data();
+SyncedMemory msm_collect_cpu(SyncedMemory step1res, int64_t npoints) {
+    SyncedMemory out(3 * fq_LIMBS, false);
+    void* out_cpu = out.mutable_cpu_data();
+    void* step1res_cpu = step1res.mutable_cpu_data();
     int64_t numel = step1res.size() / (fq_LIMBS * 4 * sizeof(uint64_t));
-    pippenger_collect(static_cast<cpu::fq*>(out_gpu), static_cast<fq*>(step1res_gpu), npoints, numel);
+    pippenger_collect(static_cast<cpu::fq*>(out_cpu), static_cast<cpu::fq*>(step1res_cpu), npoints, numel);
     return out;
   }
 }//namespace::cpu

@@ -1,1 +1,0 @@
-const int SBOX_ALPHA = 5;

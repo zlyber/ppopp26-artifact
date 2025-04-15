@@ -1,9 +1,8 @@
-#pragma once
-#include "PLONK/src/bls12_381/fr.hpp"
+#include "edwards.cuh"
 
 using namespace caffe;
 
-SyncedMemory& COEFF_A(){
+SyncedMemory COEFF_A(){
     SyncedMemory res(fr::Limbs * sizeof(uint64_t));
     void* res_ = res.mutable_gpu_data();
     uint64_t coeff_a[fr::Limbs] = 
@@ -18,7 +17,7 @@ SyncedMemory& COEFF_A(){
 }
 
 
-SyncedMemory& COEFF_D(){
+SyncedMemory COEFF_D(){
     SyncedMemory res(fr::Limbs * sizeof(uint64_t));
     void* res_ = res.mutable_gpu_data();
     uint64_t coeff_d[fr::Limbs] = 

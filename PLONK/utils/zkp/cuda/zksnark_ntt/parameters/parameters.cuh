@@ -134,13 +134,13 @@ __launch_bounds__(512) __global__ void generate_radixX_twiddles_X(
 template <typename T>
 struct NTTHyperParam;
 
-#include "PLONK/utils/zkp/cuda/zksnark_ntt/parameters/bls12_381.h"
-
+#include "bls12_381.h"
+#include "../../../../../../caffe/common.hpp"
 template <typename T>
 struct Constants;
 
 template <typename fr_t>
-void NTTParameters(bool inverse, fr_t* data_ptr, fr_t* local_params) {
+void NTTParameters(bool inverse, fr_t* data_ptr, fr_t* local_params, cudaStream_t stream = (cudaStream_t)0) {
   const size_t blob_sz = 64 + 128 + 256 + 512 + 32;
 
   const size_t partial_sz = WINDOW_NUM * WINDOW_SIZE;
@@ -151,67 +151,73 @@ void NTTParameters(bool inverse, fr_t* data_ptr, fr_t* local_params) {
       local_params,
       NTTHyperParam<fr_t>::inverse_roots_of_unity.data(),
       inverse_sz * sizeof(fr_t),
-      cudaMemcpyHostToDevice);
-
+      cudaMemcpyHostToDevice,
+      stream);
+  CUDA_CHECK(cudaGetLastError());
   cudaMemcpyAsync(
       local_params + inverse_sz,
       NTTHyperParam<fr_t>::forward_roots_of_unity.data(),
       inverse_sz * sizeof(fr_t),
-      cudaMemcpyHostToDevice);
-
+      cudaMemcpyHostToDevice,
+      stream);
+  CUDA_CHECK(cudaGetLastError());
   const fr_t* roots = inverse ? (const fr_t*)(local_params)
                               : (const fr_t*)(local_params + inverse_sz);
 
-  generate_partial_twiddles<<<WINDOW_SIZE / 32, 32, 0>>>(
+  generate_partial_twiddles<<<WINDOW_SIZE / 32, 32, 0, stream>>>(
       data_ptr, roots + MAX_LG_DOMAIN_SIZE);
-
+  CUDA_CHECK(cudaGetLastError());
   cudaMemcpyAsync(
       local_params + 2 * inverse_sz,
       NTTHyperParam<fr_t>::group_gen_inverse.data(),
       sizeof(fr_t),
-      cudaMemcpyHostToDevice);
-
+      cudaMemcpyHostToDevice,
+      stream);
+  CUDA_CHECK(cudaGetLastError());
   cudaMemcpyAsync(
       local_params + 2 * inverse_sz + 1,
       NTTHyperParam<fr_t>::group_gen.data(),
       sizeof(fr_t),
-      cudaMemcpyHostToDevice);
-
-  generate_partial_twiddles<<<WINDOW_SIZE / 32, 32, 0>>>(
+      cudaMemcpyHostToDevice,
+      stream);
+  CUDA_CHECK(cudaGetLastError());
+  generate_partial_twiddles<<<WINDOW_SIZE / 32, 32, 0, stream>>>(
       data_ptr + partial_sz,
       inverse ? (local_params + 2 * inverse_sz)
               : (local_params + 2 * inverse_sz + 1));
-
-  generate_all_twiddles<<<blob_sz / 32, 32, 0>>>(
+  CUDA_CHECK(cudaGetLastError());
+  generate_all_twiddles<<<blob_sz / 32, 32, 0, stream>>>(
       data_ptr + 2 * partial_sz,
       roots + 6,
       roots + 7,
       roots + 8,
       roots + 9,
       roots + 10);
-
-  generate_radixX_twiddles_X<<<16, 64, 0>>>(
+  CUDA_CHECK(cudaGetLastError());
+  generate_radixX_twiddles_X<<<16, 64, 0, stream>>>(
       data_ptr + 2 * partial_sz + blob_sz, 64, roots + 12);
-  generate_radixX_twiddles_X<<<16, 64, 0>>>(
+  generate_radixX_twiddles_X<<<16, 64, 0, stream>>>(
       data_ptr + 2 * partial_sz + blob_sz + 64 * 64, 4096, roots + 18);
-  generate_radixX_twiddles_X<<<16, 128, 0>>>(
+  generate_radixX_twiddles_X<<<16, 128, 0, stream>>>(
       data_ptr + 2 * partial_sz + blob_sz + 64 * 64 + 4096 * 64,
       128,
       roots + 14);
-  generate_radixX_twiddles_X<<<16, 256, 0>>>(
+  generate_radixX_twiddles_X<<<16, 256, 0, stream>>>(
       data_ptr + 2 * partial_sz + blob_sz + 64 * 64 + 4096 * 64 + 128 * 128,
       256,
       roots + 16);
-  generate_radixX_twiddles_X<<<16, 512, 0>>>(
+  generate_radixX_twiddles_X<<<16, 512, 0, stream>>>(
       data_ptr + 2 * partial_sz + blob_sz + 64 * 64 + 4096 * 64 + 128 * 128 +
           256 * 256,
       512,
       roots + 18);
-
+  CUDA_CHECK(cudaGetLastError());
   cudaMemcpyAsync(
       data_ptr + 2 * partial_sz + blob_sz + 64 * 64 + 4096 * 64 + 128 * 128 +
           256 * 256 + 512 * 512,
       NTTHyperParam<fr_t>::domain_size_inverse.data(),
       inverse_sz * sizeof(fr_t),
-      cudaMemcpyHostToDevice);
+      cudaMemcpyHostToDevice,
+      stream);
+  CUDA_CHECK(cudaGetLastError());
 }

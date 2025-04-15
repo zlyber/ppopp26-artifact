@@ -19,11 +19,18 @@
 
 // CUDA: various checks for different function calls.
 // Error handling macro
-#define CUDA_CHECK(call) \
-    if((call) != cudaSuccess) { \
-        cudaError_t err = cudaGetLastError(); \
-        std::cerr << "CUDA error calling \""#call"\", code is " << err << std::endl; \
-        exit(err); }
+
+inline void __cudaErrorCheck(cudaError_t error, const char *file, int line) {
+	if (error != cudaSuccess) {
+		std::cerr << "CUDA error: " << cudaGetErrorString(error) << " at " << file << ":" << line << std::endl;
+		exit(EXIT_FAILURE);
+	}
+}
+
+#define CUDA_CHECK(error) __cudaErrorCheck(error, __FILE__, __LINE__)
+
+
+
 
 namespace caffe {
 

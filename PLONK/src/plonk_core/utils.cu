@@ -1,16 +1,15 @@
-#include <vector>
-#include "PLONK/utils/function.cuh"
-#include "caffe/syncedmem.hpp"
-#include "PLONK/src/structure.cuh"
+#include "utils.cuh"
+
 // Linear combination of a series of values
 // For values [v_0, v_1,... v_k] returns:
 // v_0 + challenge * v_1 + ... + challenge^k  * v_k
-SyncedMemory& lc( std::vector<SyncedMemory&>&values, SyncedMemory& challenge) {
-    
-    SyncedMemory& kth_val_temp = values.back();
-    for (auto it = values.rbegin() + 1; it != values.rend(); ++it) {
-        kth_val = mul_mod_scalar(kth_val_temp, challenge);
-        kth_val = add_mod(kth_val, *it); 
+SyncedMemory lc(std::vector<SyncedMemory> values, SyncedMemory challenge) {
+    SyncedMemory res(values[values.size()-1].size());
+    void* res_gpu = res.mutable_gpu_data();
+    caffe_gpu_memcpy(res.size(), values[values.size()-1].mutable_gpu_data(), res_gpu);
+    for (int i = values.size() - 2; i; i--) {
+        mul_mod_scalar_(res, challenge);
+        add_mod_(res, values[i]); 
     }
-    return kth_val;
+    return res;
 }

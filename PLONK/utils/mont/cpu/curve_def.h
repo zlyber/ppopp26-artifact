@@ -1,7 +1,7 @@
 #pragma once
 
-#include "PLONK/utils/mont/cpu/ff/bls12-377.hpp"
-#include "PLONK/utils/mont/cpu/ff/bls12-381.hpp"
+#include "ff/bls12-377.hpp"
+#include "ff/bls12-381.hpp"
 
 namespace cpu{
     constexpr int fr_LIMBS = 4;
@@ -12,5 +12,5 @@ namespace cpu{
     using fq = BLS12_381_Fq_G1;
     
     template <typename T>
-    int num_uint64(T a) { return (a.bit_length() + 63)/64;}
+    int num_uint64(T* a) { return (T::bit_length() + 63)/64;}
 }//namespace::cpu

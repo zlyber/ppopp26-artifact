@@ -1,237 +1,201 @@
-#include "PLONK/src/structure.cuh"
-#include "PLONK/src/bls12_381/fr.hpp"
+#include "structure.cuh"
+#include "bls12_381/fr.cuh"
 
-LookupTable::LookupTable(SyncedMemory& ql, SyncedMemory& t1, SyncedMemory& t2, SyncedMemory& t3, SyncedMemory& t4)
+
+std::vector<SyncedMemory> chunk(uint64_t* input, size_t size, int chunk_num)
+{
+   std::vector<SyncedMemory> output;
+   output.reserve(chunk_num);
+   for(int i = 0; i< chunk_num; i++){
+      SyncedMemory out(size);
+      void* out_ = out.mutable_cpu_data();
+      memcpy(out_, reinterpret_cast<char*>(input) + i*out.size(), out.size());
+      output.push_back(out);
+   }
+   return output;
+}
+
+std::vector<SyncedMemory> chunk_gpu(SyncedMemory input, int chunk_num, cudaStream_t stream)
+{
+   std::vector<SyncedMemory> output;
+   void* input_ = input.mutable_gpu_data_async(stream);
+   output.reserve(chunk_num);
+   size_t size = input.size()/chunk_num;
+   for(int i = 0; i< chunk_num; i++){
+      SyncedMemory out(size);
+      void* out_ = out.mutable_gpu_data_async(stream);
+      caffe_gpu_memcpy_async(out.size(), input_ + i*out.size(), out_, stream);
+      output.push_back(out);
+   }
+   return output;
+}
+
+std::vector<SyncedMemory> copy(std::vector<SyncedMemory> input, uint64_t chunk_size)
+{
+   int chunk_num = input.size();
+   std::vector<SyncedMemory> output;
+   output.reserve(chunk_num);
+   int type = input[0].head();
+   if(type == 1){
+    for(int i =0; i<chunk_num;i++){
+        SyncedMemory out(chunk_size);
+        void* out_ = out.mutable_cpu_data();
+        void* in_ = input[i].mutable_cpu_data();
+        memcpy(out_, in_, chunk_size);
+        output.push_back(out);
+    }
+   }
+   else if(type == 2){
+    for(int i =0; i<chunk_num;i++){
+        SyncedMemory out(chunk_size);
+        void* out_ = out.mutable_gpu_data();
+        void* in_ = input[i].mutable_gpu_data();
+        caffe_gpu_memcpy(chunk_size, in_, out_);
+        output.push_back(out);
+    }
+   }
+    return output;
+}
+
+LookupTable::LookupTable(SyncedMemory ql, std::vector<SyncedMemory> t1, 
+                         std::vector<SyncedMemory> t2, std::vector<SyncedMemory> t3, 
+                         std::vector<SyncedMemory> t4)
     : q_lookup(ql), table1(t1), table2(t2), table3(t3), table4(t4) {}
 
-Arithmetic::Arithmetic(SyncedMemory& qm, SyncedMemory& ql, SyncedMemory& qr,
-               SyncedMemory& qo, SyncedMemory& q4, SyncedMemory& qc,
-               SyncedMemory& qhl, SyncedMemory& qhr, SyncedMemory& qh4,
-               SyncedMemory& qarith)
+
+Arithmetic::Arithmetic(std::vector<SyncedMemory> qm, std::vector<SyncedMemory> ql, std::vector<SyncedMemory> qr,
+               std::vector<SyncedMemory> qo, std::vector<SyncedMemory> q4, std::vector<SyncedMemory> qc,
+               std::vector<SyncedMemory> qhl, std::vector<SyncedMemory> qhr, std::vector<SyncedMemory> qh4,
+               std::vector<SyncedMemory> qarith)
         : q_m(qm), q_l(ql), q_r(qr), q_o(qo), q_4(q4),
           q_c(qc), q_hl(qhl), q_hr(qhr), q_h4(qh4), q_arith(qarith) {}
 
-Permutation::Permutation(SyncedMemory& ls, SyncedMemory& rs, SyncedMemory& os, SyncedMemory& fs)
-        : left_sigma(ls), right_sigma(rs), out_sigma(os), fourth_sigma(fs) {}
+
+Selectors::Selectors(std::vector<SyncedMemory> rs, std::vector<SyncedMemory> ls, 
+                     std::vector<SyncedMemory> fs, std::vector<SyncedMemory> vs)
+        : range_selector(rs), logic_selector(ls),
+          fixed_group_add_selector(fs), variable_group_add_selector(vs) {}
+
 
 ProverKey::ProverKey(
-        SyncedMemory& q_m_coeffs, SyncedMemory& q_m_evals,
-        SyncedMemory& q_l_coeffs, SyncedMemory& q_l_evals,
-        SyncedMemory& q_r_coeffs, SyncedMemory& q_r_evals,
-        SyncedMemory& q_o_coeffs, SyncedMemory& q_o_evals,
-        SyncedMemory& q_4_coeffs, SyncedMemory& q_4_evals,
-        SyncedMemory& q_c_coeffs, SyncedMemory& q_c_evals,
-        SyncedMemory& q_hl_coeffs, SyncedMemory& q_hl_evals,
-        SyncedMemory& q_hr_coeffs, SyncedMemory& q_hr_evals,
-        SyncedMemory& q_h4_coeffs, SyncedMemory& q_h4_evals,
-        SyncedMemory& q_arith_coeffs, SyncedMemory& q_arith_evals,
-        SyncedMemory& range_selector_coeffs, SyncedMemory& range_selector_evals,
-        SyncedMemory& logic_selector_coeffs, SyncedMemory& logic_selector_evals,
-        SyncedMemory& fixed_group_add_selector_coeffs, SyncedMemory& fixed_group_add_selector_evals,
-        SyncedMemory& variable_group_add_selector_coeffs, SyncedMemory& variable_group_add_selector_evals,
-        SyncedMemory& q_lookup_coeffs, SyncedMemory& q_lookup_evals,
-        SyncedMemory& table1, SyncedMemory& table2, SyncedMemory& table3, SyncedMemory& table4,
-        SyncedMemory& left_sigma_coeffs, SyncedMemory& left_sigma_evals,
-        SyncedMemory& right_sigma_coeffs, SyncedMemory& right_sigma_evals,
-        SyncedMemory& out_sigma_coeffs, SyncedMemory& out_sigma_evals,
-        SyncedMemory& fourth_sigma_coeffs, SyncedMemory& fourth_sigma_evals,
-        SyncedMemory& linear_evaluations,
-        SyncedMemory& v_h_coset_8n) : 
+        std::vector<SyncedMemory> q_m_coeffs, std::vector<SyncedMemory> q_m_evals,
+        std::vector<SyncedMemory> q_l_coeffs, std::vector<SyncedMemory> q_l_evals,
+        std::vector<SyncedMemory> q_r_coeffs, std::vector<SyncedMemory> q_r_evals,
+        std::vector<SyncedMemory> q_o_coeffs, std::vector<SyncedMemory> q_o_evals,
+        std::vector<SyncedMemory> q_4_coeffs, std::vector<SyncedMemory> q_4_evals,
+        std::vector<SyncedMemory> q_c_coeffs, std::vector<SyncedMemory> q_c_evals,
+        std::vector<SyncedMemory> q_hl_coeffs, std::vector<SyncedMemory> q_hl_evals,
+        std::vector<SyncedMemory> q_hr_coeffs, std::vector<SyncedMemory> q_hr_evals,
+        std::vector<SyncedMemory> q_h4_coeffs, std::vector<SyncedMemory> q_h4_evals,
+        std::vector<SyncedMemory> q_arith_coeffs, std::vector<SyncedMemory> q_arith_evals,
+        std::vector<SyncedMemory> range_selector_coeffs, std::vector<SyncedMemory> range_selector_evals,
+        std::vector<SyncedMemory> logic_selector_coeffs, std::vector<SyncedMemory> logic_selector_evals,
+        std::vector<SyncedMemory> fixed_group_add_selector_coeffs, std::vector<SyncedMemory> fixed_group_add_selector_evals,
+        std::vector<SyncedMemory> variable_group_add_selector_coeffs, std::vector<SyncedMemory> variable_group_add_selector_evals,
+        SyncedMemory q_lookup_coeffs, std::vector<SyncedMemory> q_lookup_evals,
+        std::vector<SyncedMemory> table1, std::vector<SyncedMemory> table2, std::vector<SyncedMemory> table3, std::vector<SyncedMemory> table4,
+        std::vector<SyncedMemory> left_sigma_coeffs, std::vector<SyncedMemory> left_sigma_evals,
+        std::vector<SyncedMemory> right_sigma_coeffs, std::vector<SyncedMemory> right_sigma_evals,
+        std::vector<SyncedMemory> out_sigma_coeffs, std::vector<SyncedMemory> out_sigma_evals,
+        std::vector<SyncedMemory> fourth_sigma_coeffs, std::vector<SyncedMemory> fourth_sigma_evals,
+        std::vector<SyncedMemory> linear_evaluations,
+        std::vector<SyncedMemory> v_h_coset_8n) : 
         arithmetic_coeffs(Arithmetic(q_m_coeffs, q_l_coeffs, q_r_coeffs, q_o_coeffs, 
                                      q_4_coeffs, q_c_coeffs, q_hl_coeffs, q_hr_coeffs, q_h4_coeffs, q_arith_coeffs)),
         arithmetic_evals(Arithmetic(q_m_evals, q_l_evals, q_r_evals, q_o_evals, 
                                     q_4_evals, q_c_evals, q_hl_evals, q_hr_evals, q_h4_evals, q_arith_evals)),
-        range_selector_coeffs(range_selector_coeffs), range_selector_evals(range_selector_evals),
-        logic_selector_coeffs(logic_selector_coeffs), logic_selector_evals(logic_selector_evals),
-        fixed_group_add_selector_coeffs(fixed_group_add_selector_coeffs), fixed_group_add_selector_evals(fixed_group_add_selector_evals),
-        variable_group_add_selector_coeffs(variable_group_add_selector_coeffs), variable_group_add_selector_evals(variable_group_add_selector_evals),
+        selectors_coeffs(Selectors(range_selector_coeffs, logic_selector_coeffs,
+                                   fixed_group_add_selector_coeffs, variable_group_add_selector_coeffs)),
+        selectors_evals(Selectors(range_selector_evals, logic_selector_evals,
+                                   fixed_group_add_selector_evals, variable_group_add_selector_evals)),
         lookup_coeffs(LookupTable(q_lookup_coeffs, table1, table2, table3, table4)), lookup_evals(q_lookup_evals),
         permutation_coeffs(Permutation(left_sigma_coeffs, right_sigma_coeffs, out_sigma_coeffs, fourth_sigma_coeffs)),
         permutation_evals(Permutation(left_sigma_evals, right_sigma_evals, out_sigma_evals, fourth_sigma_evals)),
         linear_evaluations(linear_evaluations),
         v_h_coset_8n(v_h_coset_8n) {}
 
-ProverKey load_pk(ProverKeyC pk, uint64_t n) {
-    uint64_t coeff_size = n;
-    uint64_t eval_size = 8 * n;
 
-    SyncedMemory q_m_coeffs(coeff_size*fr::Limbs*sizeof(uint64_t));
-    void* q_m_coeffs_gpu = q_m_coeffs.mutable_gpu_data();
-    caffe_gpu_memcpy(q_m_coeffs.size(), q_m_coeffs_gpu, pk.q_m_coeffs);
+ProverKey load_pk(ProverKeyC pk, uint64_t n, int chunk_num) {
 
-    SyncedMemory q_m_evals(eval_size*fr::Limbs*sizeof(uint64_t));
-    void* q_m_evals_gpu = q_m_evals.mutable_gpu_data();
-    caffe_gpu_memcpy(q_m_evals.size(), q_m_evals_gpu, pk.q_m_evals);
+    size_t size = n*fr::Limbs*sizeof(uint64_t)/chunk_num;
+    int coset_chunk_num = chunk_num*8;
 
-    SyncedMemory q_l_coeffs(coeff_size*fr::Limbs*sizeof(uint64_t));
-    void* q_l_coeffs_gpu = q_l_coeffs.mutable_gpu_data();
-    caffe_gpu_memcpy(q_l_coeffs.size(), q_l_coeffs_gpu, pk.q_l_coeffs);
+    std::vector<SyncedMemory> q_m_coeffs;
+    std::vector<SyncedMemory> q_m_evals = chunk(pk.q_m_evals, size, coset_chunk_num);
 
-    SyncedMemory q_l_evals(eval_size*fr::Limbs*sizeof(uint64_t));
-    void* q_l_evals_gpu = q_l_evals.mutable_gpu_data();
-    caffe_gpu_memcpy(q_l_evals.size(), q_l_evals_gpu, pk.q_l_evals);
+    std::vector<SyncedMemory> q_l_coeffs = chunk(pk.q_l_coeffs, size, chunk_num);
+    std::vector<SyncedMemory> q_l_evals = chunk(pk.q_l_evals, size, coset_chunk_num);
 
-    SyncedMemory q_r_coeffs(coeff_size*fr::Limbs*sizeof(uint64_t));
-    void* q_r_coeffs_gpu = q_r_coeffs.mutable_gpu_data();
-    caffe_gpu_memcpy(q_r_coeffs.size(), q_r_coeffs_gpu, pk.q_r_coeffs);
+    std::vector<SyncedMemory> q_r_coeffs = chunk(pk.q_r_coeffs, size, chunk_num);
+    std::vector<SyncedMemory> q_r_evals = chunk(pk.q_r_evals, size, coset_chunk_num);
 
-    SyncedMemory q_r_evals(eval_size*fr::Limbs*sizeof(uint64_t));
-    void* q_r_evals_gpu = q_r_evals.mutable_gpu_data();
-    caffe_gpu_memcpy(q_r_evals.size(), q_r_evals_gpu, pk.q_r_evals);
+    std::vector<SyncedMemory> q_o_coeffs = chunk(pk.q_o_coeffs, size, chunk_num);
+    std::vector<SyncedMemory> q_o_evals = chunk(pk.q_o_evals, size, coset_chunk_num);
 
-    SyncedMemory q_o_coeffs(coeff_size*fr::Limbs*sizeof(uint64_t));
-    void* q_o_coeffs_gpu = q_o_coeffs.mutable_gpu_data();
-    caffe_gpu_memcpy(q_o_coeffs.size(), q_o_coeffs_gpu, pk.q_o_coeffs);
+    std::vector<SyncedMemory> q_4_coeffs = chunk(pk.q_4_coeffs, size, chunk_num);
+    std::vector<SyncedMemory> q_4_evals = chunk(pk.q_4_evals, size, coset_chunk_num);
 
-    SyncedMemory q_o_evals(eval_size*fr::Limbs*sizeof(uint64_t));
-    void* q_o_evals_gpu = q_o_evals.mutable_gpu_data();
-    caffe_gpu_memcpy(q_o_evals.size(), q_o_evals_gpu, pk.q_o_evals);
+    std::vector<SyncedMemory> q_c_coeffs = chunk(pk.q_c_coeffs, size, chunk_num);
+    std::vector<SyncedMemory> q_c_evals = chunk(pk.q_c_evals, size, coset_chunk_num);
 
-    SyncedMemory q_4_coeffs(coeff_size*fr::Limbs*sizeof(uint64_t));
-    void* q_4_coeffs_gpu = q_4_coeffs.mutable_gpu_data();
-    caffe_gpu_memcpy(q_4_coeffs.size(), q_4_coeffs_gpu, pk.q_4_coeffs);
+    std::vector<SyncedMemory> q_hl_coeffs = chunk(pk.q_hl_coeffs, size, chunk_num);
+    std::vector<SyncedMemory> q_hl_evals = chunk(pk.q_hl_evals, size, coset_chunk_num);
 
-    SyncedMemory q_4_evals(eval_size*fr::Limbs*sizeof(uint64_t));
-    void* q_4_evals_gpu = q_4_evals.mutable_gpu_data();
-    caffe_gpu_memcpy(q_4_evals.size(), q_4_evals_gpu, pk.q_4_evals);
+    std::vector<SyncedMemory> q_hr_coeffs = chunk(pk.q_hr_coeffs, size, chunk_num);
+    std::vector<SyncedMemory> q_hr_evals = chunk(pk.q_hr_evals, size, coset_chunk_num);
 
-    SyncedMemory q_c_coeffs(coeff_size*fr::Limbs*sizeof(uint64_t));
-    void* q_c_coeffs_gpu = q_c_coeffs.mutable_gpu_data();
-    caffe_gpu_memcpy(q_c_coeffs.size(), q_c_coeffs_gpu, pk.q_c_coeffs);
+    std::vector<SyncedMemory> q_h4_coeffs = chunk(pk.q_h4_coeffs, size, chunk_num);
+    std::vector<SyncedMemory> q_h4_evals = chunk(pk.q_h4_evals, size, coset_chunk_num);
 
-    SyncedMemory q_c_evals(eval_size*fr::Limbs*sizeof(uint64_t));
-    void* q_c_evals_gpu = q_c_evals.mutable_gpu_data();
-    caffe_gpu_memcpy(q_c_evals.size(), q_c_evals_gpu, pk.q_c_evals);
+    std::vector<SyncedMemory> q_arith_coeffs = chunk(pk.q_arith_coeffs, size, chunk_num);
+    std::vector<SyncedMemory> q_arith_evals = chunk(pk.q_arith_evals, size, coset_chunk_num);
 
-    SyncedMemory q_hl_coeffs(coeff_size*fr::Limbs*sizeof(uint64_t));
-    void* q_hl_coeffs_gpu = q_hl_coeffs.mutable_gpu_data();
-    caffe_gpu_memcpy(q_hl_coeffs.size(), q_hl_coeffs_gpu, pk.q_hl_coeffs);
+    std::vector<SyncedMemory> range_selector_coeffs;
+    std::vector<SyncedMemory> range_selector_evals = chunk(pk.range_selector_evals, size, coset_chunk_num);
 
-    SyncedMemory q_hl_evals(eval_size*fr::Limbs*sizeof(uint64_t));
-    void* q_hl_evals_gpu = q_hl_evals.mutable_gpu_data();
-    caffe_gpu_memcpy(q_hl_evals.size(), q_hl_evals_gpu, pk.q_hl_evals);
+    std::vector<SyncedMemory> logic_selector_coeffs;
+    std::vector<SyncedMemory> logic_selector_evals = chunk(pk.logic_selector_evals, size, coset_chunk_num);
 
-    SyncedMemory q_hr_coeffs(coeff_size*fr::Limbs*sizeof(uint64_t));
-    void* q_hr_coeffs_gpu = q_hr_coeffs.mutable_gpu_data();
-    caffe_gpu_memcpy(q_hr_coeffs.size(), q_hr_coeffs_gpu, pk.q_hr_coeffs);
+    std::vector<SyncedMemory> fixed_group_add_selector_coeffs;
+    std::vector<SyncedMemory> fixed_group_add_selector_evals = chunk(pk.fixed_group_add_selector_evals, size, coset_chunk_num);
 
-    SyncedMemory q_hr_evals(eval_size*fr::Limbs*sizeof(uint64_t));
-    void* q_hr_evals_gpu = q_hr_evals.mutable_gpu_data();
-    caffe_gpu_memcpy(q_hr_evals.size(), q_hr_evals_gpu, pk.q_hr_evals);
+    std::vector<SyncedMemory> variable_group_add_selector_coeffs;
+    std::vector<SyncedMemory> variable_group_add_selector_evals = chunk(pk.variable_group_add_selector_evals, size, coset_chunk_num);
 
+    SyncedMemory q_lookup_coeffs(0);
 
-    SyncedMemory q_h4_coeffs(coeff_size*fr::Limbs*sizeof(uint64_t));
-    void* q_h4_coeffs_gpu = q_h4_coeffs.mutable_gpu_data();
-    caffe_gpu_memcpy(q_h4_coeffs.size(), q_h4_coeffs_gpu, pk.q_h4_coeffs);
+    std::vector<SyncedMemory> table1 = chunk(pk.table1, size, chunk_num);
 
-    SyncedMemory q_h4_evals(eval_size*fr::Limbs*sizeof(uint64_t));
-    void* q_h4_evals_gpu = q_h4_evals.mutable_gpu_data();
-    caffe_gpu_memcpy(q_h4_evals.size(), q_h4_evals_gpu, pk.q_h4_evals);
+    std::vector<SyncedMemory> table2 = chunk(pk.table2, size, chunk_num);
 
-    SyncedMemory q_arith_coeffs(coeff_size*fr::Limbs*sizeof(uint64_t));
-    void* q_arith_coeffs_gpu = q_arith_coeffs.mutable_gpu_data();
-    caffe_gpu_memcpy(q_arith_coeffs.size(), q_arith_coeffs_gpu, pk.q_arith_coeffs);
+    std::vector<SyncedMemory> table3 = chunk(pk.table3, size, chunk_num);
 
-    SyncedMemory q_arith_evals(eval_size*fr::Limbs*sizeof(uint64_t));
-    void* q_arith_evals_gpu = q_arith_evals.mutable_gpu_data();
-    caffe_gpu_memcpy(q_arith_evals.size(), q_arith_evals_gpu, pk.q_arith_evals);
+    std::vector<SyncedMemory> table4 = chunk(pk.table4, size, chunk_num);
+    
 
-    SyncedMemory range_selector_coeffs(coeff_size*fr::Limbs*sizeof(uint64_t));
-    void* range_selector_coeffs_gpu = range_selector_coeffs.mutable_gpu_data();
-    caffe_gpu_memcpy(range_selector_coeffs.size(), range_selector_coeffs_gpu, pk.range_selector_coeffs);
+    // std::vector<SyncedMemory> q_lookup_coeffs = chunk(pk.q_lookup_coeffs, size, chunk_num);
+    std::vector<SyncedMemory> q_lookup_evals = chunk(pk.q_lookup_evals, size, coset_chunk_num);
 
-    SyncedMemory range_selector_evals(eval_size*fr::Limbs*sizeof(uint64_t));
-    void* range_selector_evals_gpu = range_selector_evals.mutable_gpu_data();
-    caffe_gpu_memcpy(range_selector_evals.size(), range_selector_evals_gpu, pk.range_selector_evals);
+    // std::vector<SyncedMemory> table1 = chunk(pk.table1, size, chunk_num);
+    // std::vector<SyncedMemory> table2 = chunk(pk.table2, size, chunk_num);
+    // std::vector<SyncedMemory> table3 = chunk(pk.table3, size, chunk_num);
+    // std::vector<SyncedMemory> table4 = chunk(pk.table4, size, chunk_num);
 
-    SyncedMemory logic_selector_coeffs(coeff_size*fr::Limbs*sizeof(uint64_t));
-    void* logic_selector_coeffs_gpu = logic_selector_coeffs.mutable_gpu_data();
-    caffe_gpu_memcpy(logic_selector_coeffs.size(), logic_selector_coeffs_gpu, pk.logic_selector_coeffs);
+    std::vector<SyncedMemory> left_sigma_coeffs = chunk(pk.left_sigma_coeffs, size, chunk_num);
+    std::vector<SyncedMemory> left_sigma_evals = chunk(pk.left_sigma_evals, size, coset_chunk_num);
 
-    SyncedMemory logic_selector_evals(eval_size*fr::Limbs*sizeof(uint64_t));
-    void* logic_selector_evals_gpu = logic_selector_evals.mutable_gpu_data();
-    caffe_gpu_memcpy(logic_selector_evals.size(), logic_selector_evals_gpu, pk.logic_selector_evals);
+    std::vector<SyncedMemory> right_sigma_coeffs = chunk(pk.right_sigma_coeffs, size, chunk_num);
+    std::vector<SyncedMemory> right_sigma_evals = chunk(pk.right_sigma_evals, size, coset_chunk_num);
 
-    SyncedMemory fixed_group_add_selector_coeffs(coeff_size*fr::Limbs*sizeof(uint64_t));
-    void* fixed_group_add_selector_coeffs_gpu = fixed_group_add_selector_coeffs.mutable_gpu_data();
-    caffe_gpu_memcpy(fixed_group_add_selector_coeffs.size(), fixed_group_add_selector_coeffs_gpu, pk.fixed_group_add_selector_coeffs);
+    std::vector<SyncedMemory> out_sigma_coeffs = chunk(pk.out_sigma_coeffs, size, chunk_num);
+    std::vector<SyncedMemory> out_sigma_evals = chunk(pk.out_sigma_evals, size, coset_chunk_num);
 
-    SyncedMemory fixed_group_add_selector_evals(eval_size*fr::Limbs*sizeof(uint64_t));
-    void* fixed_group_add_selector_evals_gpu = fixed_group_add_selector_evals.mutable_gpu_data();
-    caffe_gpu_memcpy(fixed_group_add_selector_evals.size(), fixed_group_add_selector_evals_gpu, pk.fixed_group_add_selector_evals);
+    std::vector<SyncedMemory> fourth_sigma_coeffs = chunk(pk.fourth_sigma_coeffs, size, chunk_num);
+    std::vector<SyncedMemory> fourth_sigma_evals = chunk(pk.fourth_sigma_evals, size, coset_chunk_num);
 
-    SyncedMemory variable_group_add_selector_coeffs(coeff_size*fr::Limbs*sizeof(uint64_t));
-    void* variable_group_add_selector_coeffs_gpu = variable_group_add_selector_coeffs.mutable_gpu_data();
-    caffe_gpu_memcpy(variable_group_add_selector_coeffs.size(), variable_group_add_selector_coeffs_gpu, pk.variable_group_add_selector_coeffs);
+    std::vector<SyncedMemory> linear_evaluations = chunk(pk.linear_evaluations, size, coset_chunk_num);
+    std::vector<SyncedMemory> v_h_coset_8n = chunk(pk.v_h_coset_8n, size, coset_chunk_num);
 
-    SyncedMemory variable_group_add_selector_evals(eval_size*fr::Limbs*sizeof(uint64_t));
-    void* variable_group_add_selector_evals_gpu = variable_group_add_selector_evals.mutable_gpu_data();
-    caffe_gpu_memcpy(variable_group_add_selector_evals.size(), variable_group_add_selector_evals_gpu, pk.variable_group_add_selector_evals);
-
-    SyncedMemory q_lookup_coeffs(coeff_size*fr::Limbs*sizeof(uint64_t));
-    void* q_lookup_coeffs_gpu = q_lookup_coeffs.mutable_gpu_data();
-    caffe_gpu_memcpy(q_lookup_coeffs.size(), q_lookup_coeffs_gpu, pk.q_lookup_coeffs);
-
-    SyncedMemory q_lookup_evals(eval_size*fr::Limbs*sizeof(uint64_t));
-    void* q_lookup_evals_gpu = q_lookup_evals.mutable_gpu_data();
-    caffe_gpu_memcpy(q_lookup_evals.size(), q_lookup_evals_gpu, pk.q_lookup_evals);
-
-    SyncedMemory table1(coeff_size*fr::Limbs*sizeof(uint64_t));
-    void* table1_gpu = table1.mutable_gpu_data();
-    caffe_gpu_memcpy(table1.size(), table1_gpu, pk.table1);
-
-    SyncedMemory table2(coeff_size*fr::Limbs*sizeof(uint64_t));
-    void* table2_gpu = table2.mutable_gpu_data();
-    caffe_gpu_memcpy(table2.size(), table2_gpu, pk.table2);
-
-    SyncedMemory table3(coeff_size*fr::Limbs*sizeof(uint64_t));
-    void* table3_gpu = table3.mutable_gpu_data();
-    caffe_gpu_memcpy(table3.size(), table3_gpu, pk.table3);
-
-    SyncedMemory table4(coeff_size*fr::Limbs*sizeof(uint64_t));
-    void* table4_gpu = table4.mutable_gpu_data();
-    caffe_gpu_memcpy(table4.size(), table4_gpu, pk.table4);
-
-    SyncedMemory left_sigma_coeffs(coeff_size*fr::Limbs*sizeof(uint64_t));
-    void* left_sigma_coeffs_gpu = left_sigma_coeffs.mutable_gpu_data();
-    caffe_gpu_memcpy(left_sigma_coeffs.size(), left_sigma_coeffs_gpu, pk.left_sigma_coeffs);
-
-    SyncedMemory left_sigma_evals(eval_size*fr::Limbs*sizeof(uint64_t));
-    void* left_sigma_evals_gpu = left_sigma_evals.mutable_gpu_data();
-    caffe_gpu_memcpy(left_sigma_evals.size(), left_sigma_evals_gpu, pk.left_sigma_evals);
-
-    SyncedMemory right_sigma_coeffs(coeff_size*fr::Limbs*sizeof(uint64_t));
-    void* right_sigma_coeffs_gpu = right_sigma_coeffs.mutable_gpu_data();
-    caffe_gpu_memcpy(right_sigma_coeffs.size(), right_sigma_coeffs_gpu, pk.right_sigma_coeffs);
-
-    SyncedMemory right_sigma_evals(eval_size*fr::Limbs*sizeof(uint64_t));
-    void* right_sigma_evals_gpu = right_sigma_evals.mutable_gpu_data();
-    caffe_gpu_memcpy(right_sigma_evals.size(), right_sigma_evals_gpu, pk.right_sigma_evals);
-
-    SyncedMemory out_sigma_coeffs(coeff_size*fr::Limbs*sizeof(uint64_t));
-    void* out_sigma_coeffs_gpu = out_sigma_coeffs.mutable_gpu_data();
-    caffe_gpu_memcpy(out_sigma_coeffs.size(), out_sigma_coeffs_gpu, pk.out_sigma_coeffs);
-
-    SyncedMemory out_sigma_evals(eval_size*fr::Limbs*sizeof(uint64_t));
-    void* out_sigma_evals_gpu = out_sigma_evals.mutable_gpu_data();
-    caffe_gpu_memcpy(out_sigma_evals.size(), out_sigma_evals_gpu, pk.out_sigma_evals);
-
-    SyncedMemory fourth_sigma_coeffs(coeff_size*fr::Limbs*sizeof(uint64_t));
-    void* fourth_sigma_coeffs_gpu = fourth_sigma_coeffs.mutable_gpu_data();
-    caffe_gpu_memcpy(fourth_sigma_coeffs.size(), fourth_sigma_coeffs_gpu, pk.fourth_sigma_coeffs);
-
-    SyncedMemory fourth_sigma_evals(eval_size*fr::Limbs*sizeof(uint64_t));
-    void* fourth_sigma_evals_gpu = fourth_sigma_evals.mutable_gpu_data();
-    caffe_gpu_memcpy(fourth_sigma_evals.size(), fourth_sigma_evals_gpu, pk.fourth_sigma_evals);
-
-    SyncedMemory linear_evaluations(eval_size*fr::Limbs*sizeof(uint64_t));
-    void* linear_evaluations_gpu = linear_evaluations.mutable_gpu_data();
-    caffe_gpu_memcpy(linear_evaluations.size(), linear_evaluations_gpu, pk.linear_evaluations);
-
-
-    SyncedMemory v_h_coset_8n(eval_size*fr::Limbs*sizeof(uint64_t));
-    void* v_h_coset_8n_gpu = v_h_coset_8n.mutable_gpu_data();
-    caffe_gpu_memcpy(v_h_coset_8n.size(), v_h_coset_8n_gpu, pk.v_h_coset_8n);
 
     ProverKey proverkey = ProverKey(q_m_coeffs,
          q_m_evals,
@@ -282,68 +246,45 @@ ProverKey load_pk(ProverKeyC pk, uint64_t n) {
 
 Circuit::Circuit(
         uint64_t n,
-        uint64_t lookup_len,
         uint64_t intended_pi_pos,
-        SyncedMemory& public_inputs,
-        SyncedMemory& cs_q_lookup,
-        SyncedMemory& w_l,
-        SyncedMemory& w_r,
-        SyncedMemory& w_o,
-        SyncedMemory& w_4
-    ) : n(n), lookup_len(lookup_len),
+        std::vector<SyncedMemory> cs_q_lookup,
+        SyncedMemory public_inputs,
+        std::vector<SyncedMemory> w_l,
+        std::vector<SyncedMemory> w_r,
+        std::vector<SyncedMemory> w_o,
+        std::vector<SyncedMemory> w_4
+    ) : n(n), 
         intended_pi_pos(intended_pi_pos),
-        public_inputs(public_inputs),
         cs_q_lookup(cs_q_lookup),
+        public_inputs(public_inputs),
         w_l(w_l),
         w_r(w_r),
         w_o(w_o),
         w_4(w_4)
     {}
 
-Circuit load_cs(CircuitC cs, uint64_t n){
-    SyncedMemory q_lookup(n*fr::Limbs*sizeof(uint64_t));
-    void* q_lookup_gpu = q_lookup.mutable_gpu_data();
-    caffe_gpu_memcpy(q_lookup.size(), q_lookup_gpu, cs.cs_q_lookup);
-
+Circuit load_cs(CircuitC cs, int chunk_num){
+    uint64_t n = 1<<26;
+    size_t size = n*fr::Limbs*sizeof(uint64_t)/chunk_num;
+    std::vector<SyncedMemory> q_lookup = chunk(cs.cs_q_lookup, size, chunk_num);
+    std::vector<SyncedMemory> w_l = chunk(cs.w_l, size, chunk_num);
+    std::vector<SyncedMemory> w_r = chunk(cs.w_r, size, chunk_num);
+    std::vector<SyncedMemory> w_o = chunk(cs.w_o, size, chunk_num);
+    std::vector<SyncedMemory> w_4 = chunk(cs.w_4, size, chunk_num);
     SyncedMemory pi(fr::Limbs*sizeof(uint64_t));
-    void* pi_gpu = q_lookup.mutable_gpu_data();
-    caffe_gpu_memcpy(pi.size(), pi_gpu, cs.public_inputs);
-
-    SyncedMemory w_l(n*fr::Limbs*sizeof(uint64_t));
-    void* w_l_gpu = w_l.mutable_gpu_data();
-    caffe_gpu_memcpy(w_l.size(), w_l_gpu, cs.w_l);
-
-    SyncedMemory w_r(n*fr::Limbs*sizeof(uint64_t));
-    void* w_r_gpu = w_r.mutable_gpu_data();
-    caffe_gpu_memcpy(w_r.size(), w_r_gpu, cs.w_r);
-
-    SyncedMemory w_o(n*fr::Limbs*sizeof(uint64_t));
-    void* w_o_gpu = w_o.mutable_gpu_data();
-    caffe_gpu_memcpy(w_o.size(), w_o_gpu, cs.w_o);
-
-    SyncedMemory w_4(n*fr::Limbs*sizeof(uint64_t));
-    void* w_4_gpu = w_o.mutable_gpu_data();
-    caffe_gpu_memcpy(w_4.size(), w_4_gpu, cs.w_4);
-
-    return Circuit(cs.n,cs.lookup_len,cs.intended_pi_pos, pi,
-                   q_lookup, w_l, w_r, w_o, w_4);
+    uint64_t pi_64[4] = {4096197448552212605, 13022290890408443230, 10052896554840191078, 333484707567578785};
+    void* pi_cpu = pi.mutable_cpu_data();
+    memcpy(pi_cpu, pi_64, pi.size());
+    uint64_t intended_pi_pos = 50593603;
+    return Circuit(n, intended_pi_pos, 
+                   q_lookup, pi, w_l, w_r, w_o, w_4);
 }
 
 CommitKey::CommitKey(
-        SyncedMemory& powers_of_g,
-        SyncedMemory& powers_of_gamma_g
+        SyncedMemory powers_of_g,
+        SyncedMemory powers_of_gamma_g
     ) : powers_of_g(powers_of_g),
         powers_of_gamma_g(powers_of_gamma_g)
     {}
 
-CommitKey load_ck(CommitKeyC ck, uint64_t n){
-    SyncedMemory powers_of_g(2 * n * fq::Limbs * sizeof(uint64_t));
-    void* powers_of_g_gpu = powers_of_g.mutable_gpu_data();
-    caffe_gpu_memcpy(powers_of_g.size(), powers_of_g_gpu, ck.powers_of_g);
 
-    SyncedMemory powers_of_gamma_g(2 * fq::Limbs * sizeof(uint64_t));
-    void* powers_of_gamma_g_gpu = powers_of_gamma_g.mutable_gpu_data();
-    caffe_gpu_memcpy(powers_of_gamma_g.size(), powers_of_gamma_g_gpu, ck.powers_of_gamma_g);
-
-    return CommitKey(powers_of_g, powers_of_gamma_g);
-}

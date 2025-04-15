@@ -4,10 +4,9 @@
 #include <limits>
 #include <cuda.h>
 #include <cuda_runtime.h>
-#include "PLONK/utils/mont/cuda/curve_def.cuh"
-#include "caffe/syncedmem.hpp"
+#include "curve_def.cuh"
+#include "../../../../caffe/interface.hpp"
 
-using namespace caffe;
 #pragma clang diagnostic ignored "-Wmissing-prototypes"
 
 namespace cuda{
@@ -17,7 +16,7 @@ namespace cuda{
 
 #define BIN_KERNEL(name, op)                           \
   template <typename T>                                \
-  __global__ void mont_##name##_mod_kernel(            \
+  __launch_bounds__(1024) __global__ void mont_##name##_mod_kernel(  \
       const int64_t N, T* c, const T* a, const T* b) { \
     int64_t i = blockIdx.x * blockDim.x + threadIdx.x; \
     if (i < N) {                                       \
@@ -53,50 +52,56 @@ namespace cuda{
 
 #define BIN_OP_TEMPLATE(name)                                                  \
   template <typename T>                                                        \
-  static void name##_template(T* c, T* a, T* b, int64_t numel) {               \
-      int64_t N = numel / num_uint64(a[0]);                                    \
-      int64_t grid = (N + block_work_size() - 1) / block_work_size();          \
-      mont_##name##_mod_kernel<<<grid, block_work_size(), 0>>>(                \
+  static void name##_template(T* c, T* a, T* b, int64_t numel, cudaStream_t stream) {  \
+      int64_t N = numel / num_uint64(a);                                       \
+      int64_t grid = (N + 128 - 1) / 128;          \
+      mont_##name##_mod_kernel<<<grid, block_work_size(), 0, stream>>>(           \
           N, c, a, b);                                                         \
-  }                                                                            \ 
+      CUDA_CHECK(cudaGetLastError());                                          \
+  }                                                                            \
   template <typename T>                                                        \
-  static void name##_template_(T* self, T* other, int64_t numel) {             \
-      int64_t N = numel / num_uint64(self[0]);                                 \
-      int64_t grid = (N + block_work_size() - 1) / block_work_size();          \
-      mont_##name##_mod_kernel_<<<grid, block_work_size(), 0>>>(               \
+  static void name##_template_(T* self, T* other, int64_t numel, cudaStream_t stream) {  \
+      int64_t N = numel / num_uint64(self);                                    \
+      int64_t grid = (N + 128 - 1) / 128;          \
+      mont_##name##_mod_kernel_<<<grid, 128, 0, stream>>>(          \
           N, self, other);                                                     \
-  }                                                                            \                                                      
+      CUDA_CHECK(cudaGetLastError());                                          \
+  }                                                                            \                                                 
 
 #define SCALAR_OP_TEMPLATE(name)                                           \
   template <typename T>                                                    \
   static void name##_scalar_template(                                      \
-      T* c, T* a, T* b, int64_t numel) {                                   \
-          int64_t N = numel / num_uint64(a[0]);                            \
+      T* c, T* a, T* b, int64_t numel, cudaStream_t stream) {              \
+          int64_t N = numel / num_uint64(a);                               \
           int64_t grid = (N + block_work_size() - 1) / block_work_size();  \
           mont_##name##_scalar_mod_kernel<<<                               \
               grid,                                                        \
               block_work_size(),                                           \
-              0>>>(N, c, a, b);                                            \
+              0,                                                           \
+              stream>>>(N, c, a, b);                                       \
+          CUDA_CHECK(cudaGetLastError());                                  \
   }                                                                        \
   template <typename T>                                                    \
   static void name##_scalar_template_(                                     \
-      T* self, T* other, int64_t numel) {                                  \
-          int64_t N = numel / num_uint64(other[0]);                        \
+      T* self, T* other, int64_t numel, cudaStream_t stream) {             \
+          int64_t N = numel / num_uint64(other);                           \
           int64_t grid = (N + block_work_size() - 1) / block_work_size();  \
           mont_##name##_scalar_mod_kernel_<<<                              \
               grid,                                                        \
               block_work_size(),                                           \
-              0>>>(N, self, other);                                        \
+              0,                                                           \
+              stream>>>(N, self, other);                                   \
+          CUDA_CHECK(cudaGetLastError());                                  \
   }                                                                        \
 
 
-#define BIN_OP(name)                                                          \
-  SyncedMemory& name##_mod_cuda(SyncedMemory& a, SyncedMemory& b);            \
-  void name##_mod_cuda_(SyncedMemory& self, SyncedMemory& other);             \
+#define BIN_OP(name)                                                       \
+  SyncedMemory name##_mod_cuda(SyncedMemory a, SyncedMemory b, cudaStream_t stream = (cudaStream_t)0); \
+  void name##_mod_cuda_(SyncedMemory self, SyncedMemory other, cudaStream_t stream = (cudaStream_t)0); \
 
-#define SCALAR_OP(name)                                                       \
-  SyncedMemory& name##_mod_scalar_cuda(SyncedMemory& a, SyncedMemory& b);     \
-  void name##_mod_scalar_cuda_(SyncedMemory& self, SyncedMemory& other);      \
+#define SCALAR_OP(name)                                                    \
+  SyncedMemory name##_mod_scalar_cuda(SyncedMemory a, SyncedMemory b, cudaStream_t stream = (cudaStream_t)0);     \
+  void name##_mod_scalar_cuda_(SyncedMemory self, SyncedMemory other, cudaStream_t stream = (cudaStream_t)0);      \
 
   BIN_KERNEL(add, +);
   BIN_KERNEL(sub, -);
@@ -125,25 +130,30 @@ namespace cuda{
   SCALAR_OP(mul);
   SCALAR_OP(div); 
 
-  SyncedMemory& to_mont_cuda(SyncedMemory& input);
+  SyncedMemory to_mont_cuda(SyncedMemory input);
 
-  SyncedMemory& to_base_cuda(SyncedMemory& input);
+  SyncedMemory to_base_cuda(SyncedMemory input, cudaStream_t stream);
 
-  SyncedMemory& inv_mod_cuda(SyncedMemory& input);
+  SyncedMemory inv_mod_cuda(SyncedMemory input);
 
-  SyncedMemory& neg_mod_cuda(SyncedMemory& input);
+  SyncedMemory neg_mod_cuda(SyncedMemory input);
 
-  SyncedMemory& exp_mod_cuda(SyncedMemory& input, int64_t exp);
+  SyncedMemory exp_mod_cuda(SyncedMemory input, int64_t exp);
 
-  SyncedMemory& pad_poly_cuda(SyncedMemory& input, int64_t N);
+  SyncedMemory pad_poly_cuda(SyncedMemory input, int64_t N, cudaStream_t stream = (cudaStream_t)0);
 
-  SyncedMemory& repeat_to_poly_cuda(SyncedMemory& input, int64_t N);
+  void pad_poly_cuda_(SyncedMemory input, SyncedMemory output, int64_t N, cudaStream_t stream = (cudaStream_t)0); 
 
-  SyncedMemory& poly_eval_cuda(SyncedMemory& x, int64_t N);
+  SyncedMemory repeat_to_poly_cuda(SyncedMemory input, int64_t N, cudaStream_t stream = (cudaStream_t)0);
+  void repeat_to_poly_cuda_(SyncedMemory input, SyncedMemory output, int64_t N, cudaStream_t stream = (cudaStream_t)0);
 
-  SyncedMemory& poly_reduce_cuda(SyncedMemory& x, SyncedMemory& coeff);
+  SyncedMemory poly_eval_cuda(SyncedMemory x, int64_t N, cudaStream_t stream = (cudaStream_t)0);
+  void poly_eval_cuda_(SyncedMemory x, SyncedMemory y, int64_t N, cudaStream_t stream);
 
-  SyncedMemory& poly_div_cuda(SyncedMemory& divid_poly, SyncedMemory& c);
+  SyncedMemory poly_reduce_cuda(SyncedMemory x, SyncedMemory coeff);
 
-  SyncedMemory& accumulate_mul_poly_cuda(SyncedMemory& product_poly);
+  SyncedMemory poly_div_cuda(SyncedMemory divid_poly, SyncedMemory c);
+
+  SyncedMemory accumulate_mul_poly_cuda(SyncedMemory product_poly, cudaStream_t stream = (cudaStream_t)0);
+  void accumulate_mul_poly_cuda_(SyncedMemory product_poly, SyncedMemory output, cudaStream_t stream = (cudaStream_t)0);
 }

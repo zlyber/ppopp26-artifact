@@ -1,4 +1,4 @@
-#include "PLONK/src/structure.cuh"
+#include "structure.cuh"
 
 uint64_t next_power_of_2(uint64_t x) {
     if (x == 0) return 1;

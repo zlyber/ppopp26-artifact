@@ -4,8 +4,8 @@
 #include <assert.h>
 #include <cuda.h>
 #include <cuda_runtime.h>
-#include "PLONK/utils/mont/cuda/curve_def.cuh"
-#include "PLONK/utils/zkp/cuda/zksnark_ntt/ntt_config.h"
+#include "../../../../mont/cuda/curve_def.cuh"
+#include "../ntt_config.h"
 #pragma diag_suppress 607
 namespace cuda{
 __device__ __forceinline__ index_t bit_rev(index_t i, unsigned int nbits) {
@@ -113,9 +113,17 @@ __device__ __forceinline__ fr_t get_intermediate_root(
 }
 
 template <typename fr_t>
+__launch_bounds__(1024) __global__ void pad_and_transpose(fr_t* d_in, fr_t* d_out) {
+  index_t idx = threadIdx.x + blockDim.x * (index_t)blockIdx.x;
+  d_out[idx<<3] = d_in[idx];
+}
+
+template <typename fr_t>
 __launch_bounds__(1024) __global__ void LDE_distribute_powers(
     fr_t* d_inout,
     uint32_t lg_blowup,
+    uint32_t lg_domain_size,
+    uint64_t offset,
     bool bitrev,
     const fr_t* gen_powers,
     bool ext_pow) {
@@ -124,11 +132,7 @@ __launch_bounds__(1024) __global__ void LDE_distribute_powers(
   fr_t r = d_inout[idx];
 
   if (bitrev) {
-    size_t domain_size = gridDim.x * (size_t)blockDim.x;
-    assert((domain_size & (domain_size - 1)) == 0);
-    uint32_t lg_domain_size = 63 - __clzll(domain_size);
-
-    pow = bit_rev(idx, lg_domain_size);
+    pow = bit_rev(idx + offset, lg_domain_size);
   }
 
   if (ext_pow)

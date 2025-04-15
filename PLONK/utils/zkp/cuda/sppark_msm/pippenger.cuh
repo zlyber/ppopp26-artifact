@@ -2,13 +2,15 @@
 
 #include <cooperative_groups.h>
 #include <cuda.h>
-#include <assert.h>
+#include <cassert>
+
+#ifndef __CUDACC__
 #include <cuda_runtime.h>
+#endif
+#include <iostream>
+#include "batch_addition.cuh"
+#include "sort.cuh"
 
-#include "PLONK/utils/zkp/cuda/sppark_msm/batch_addition.cuh"
-#include "PLONK/utils/zkp/cuda/sppark_msm/sort.cuh"
-
-namespace cuda{
 #ifndef WARP_SZ
 #define WARP_SZ 32
 #endif
@@ -93,8 +95,7 @@ __launch_bounds__(1024) __global__ void breakdown(
       s.from();
 
     // clear the most significant bit
-    uint32_t msb = s[top_i] >> ((scalar_t::nbits - 1) % 32);
-    s.cneg(msb);
+    uint32_t msb = s.abs();
     msb <<= 31;
 
     scalar = s;
@@ -309,6 +310,7 @@ void launch_coop(
     dim3 gridDim,
     dim3 blockDim,
     size_t shared_sz,
+    cudaStream_t stream,
     Types... args) {
   if (SHARED_MEM_PER_BLOCK < shared_sz) {
     cudaFuncSetAttribute(
@@ -325,10 +327,11 @@ void launch_coop(
   }
   void* va_args[sizeof...(args)] = {&args...};
   cudaLaunchCooperativeKernel(
-      (const void*)f, gridDim, blockDim, va_args, shared_sz);
+      (const void*)f, gridDim, blockDim, va_args, shared_sz, stream);
 }
 
 #include <vector>
+
 
 template <
     class bucket_t,
@@ -378,7 +381,7 @@ class msm_t {
 
     wbits = 17;
     if (npoints > 192) {
-      wbits = ::std::min(lg2(npoints + npoints / 2) - 8, 18);
+      wbits = std::min(lg2(npoints + npoints / 2) - 8, 18);
       if (wbits < 10)
         wbits = 10;
     } else if (npoints > 0) {
@@ -403,6 +406,7 @@ class msm_t {
       const uint32_t temp_stride,
       const uint32_t digit_stride,
       const uint32_t hist_stride,
+      cudaStream_t stream,
       bool mont) {
     // Using larger grid size doesn't make 'sort' run faster, actually
     // quite contrary. Arguably because global memory bus gets
@@ -415,22 +419,23 @@ class msm_t {
     while (grid_size & (grid_size - 1))
       grid_size -= (grid_size & (0 - grid_size));
 
-    breakdown<<<2 * grid_size, 1024, sizeof(scalar_t) * 1024>>>(
+    breakdown<<<2 * grid_size, 1024, sizeof(scalar_t) * 1024, stream>>>(
         d_digits, d_scalars, len, digit_stride, nwins, wbits, mont);
-    cudaGetLastError();
-
+    
     const size_t shared_sz = sizeof(uint32_t) << DIGIT_BITS;
 
     // On the other hand a pair of kernels launched in parallel run
     // ~50% slower but sort twice as much data...
     uint32_t top = scalar_t::bit_length() - wbits * (nwins - 1);
     uint32_t win;
+
     for (win = 0; win < nwins - 1; win += 2) {
       launch_coop(
           sort,
           dim3{grid_size, 2},
           dim3{SORT_BLOCKDIM},
           shared_sz,
+          stream,
           d_digits,
           len,
           win,
@@ -443,12 +448,14 @@ class msm_t {
           wbits - 1,
           win == nwins - 2 ? top - 1 : wbits - 1);
     }
+
     if (win < nwins) {
       launch_coop(
           sort,
           dim3{grid_size, 1},
           dim3{SORT_BLOCKDIM},
           shared_sz,
+          stream,
           d_digits,
           len,
           win,
@@ -470,6 +477,7 @@ class msm_t {
       size_t npoints,
       scalar_t* scalars,
       uint8_t* temp,
+      cudaStream_t stream = (cudaStream_t)0,
       bool mont = true,
       size_t ffi_affine_sz = sizeof(affine_t)) {
     assert(this->npoints == 0 || npoints <= this->npoints);
@@ -484,7 +492,7 @@ class msm_t {
     // |scalars| being nullptr means the scalars are pre-loaded to
     // |d_scalars|, otherwise allocate stride.
     size_t temp_sz = scalars ? sizeof(scalar_t) : 0;
-    temp_sz = stride * ::std::max(2 * sizeof(uint2), temp_sz);
+    temp_sz = stride * std::max(2 * sizeof(uint2), temp_sz);
 
     // |points| being nullptr means the points are pre-loaded to
     // |d_points|, otherwise allocate double-stride.
@@ -509,9 +517,10 @@ class msm_t {
         temp_stride,
         digit_stride,
         hist_stride,
+        stream,
         mont);
 
-    batch_addition<bucket_t><<<smcount, BATCH_ADD_BLOCK_SIZE, 0>>>(
+    batch_addition<bucket_t><<<smcount, BATCH_ADD_BLOCK_SIZE, 0, stream>>>(
         d_buckets + (nwins << (wbits - 1)),
         points + d_off,
         num,
@@ -523,6 +532,7 @@ class msm_t {
         dim3{smcount},
         dim3{0},
         (size_t)0,
+        stream,
         d_buckets,
         nwins,
         wbits,
@@ -536,17 +546,22 @@ class msm_t {
     integrate<bucket_t>
         <<<nwins,
            MSM_NTHREADS,
-           sizeof(bucket_t) * MSM_NTHREADS / bucket_t::degree>>>(
+           sizeof(bucket_t) * MSM_NTHREADS / bucket_t::degree, stream>>>(
             d_buckets, nwins, wbits, scalar_t::bit_length());
 
-
-    cudaMemcpy(
+    cudaMemcpyAsync(
         out + nwins * MSM_NTHREADS / bucket_t::degree * 2,
         d_buckets + (nwins << (wbits - 1)),
         sizeof(bucket_t) * smcount * BATCH_ADD_BLOCK_SIZE / WARP_SZ,
-        cudaMemcpyDeviceToDevice);
+        cudaMemcpyDeviceToDevice,
+        stream);
 
-    cudaMemcpy(out, d_buckets, sizeof(result_t) * nwins, cudaMemcpyDeviceToDevice);
+    cudaMemcpy2DAsync(
+        out, sizeof(result_t), d_buckets, sizeof(bucket_h)<<(wbits-1), 
+        std::min(sizeof(result_t), sizeof(bucket_h)<<(wbits-1)), 
+        nwins,
+        cudaMemcpyDeviceToDevice,
+        stream);
   }
 };
 
@@ -564,10 +579,12 @@ static void mult_pippenger(
     bucket_h* bucket,
     uint8_t* temp,
     int64_t sm,
+    cudaStream_t stream = (cudaStream_t)0,
     bool mont = true,
-    size_t ffi_affine_sz = sizeof(affine_t)) {
+    size_t ffi_affine_sz = sizeof(affine_t)
+    ) {
   msm_t<bucket_t, point_t, affine_t, scalar_t> msm{
       nullptr, bucket, npoints, sm};
-  msm.invoke(out, points, npoints, scalars, temp, mont, ffi_affine_sz);
+  msm.invoke(out, points, npoints, scalars, temp, stream, mont, ffi_affine_sz);
 }
-}
+

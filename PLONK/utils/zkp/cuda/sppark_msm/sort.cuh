@@ -1,10 +1,8 @@
 #pragma once
-#include <cuda.h>
-#include <cuda_runtime.h>
 /*
  * Custom sorting, we take in digits and return their indices.
  */
-namespace cuda{
+
 #define SORT_BLOCKDIM 1024
 #ifndef DIGIT_BITS
 #define DIGIT_BITS 13
@@ -390,4 +388,3 @@ __launch_bounds__(SORT_BLOCKDIM) __global__ void sort(
 
 #undef asm
 #endif
-}

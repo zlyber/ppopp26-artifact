@@ -3,6 +3,8 @@
 #include <cstring>
 #include <stdexcept>
 #include <cassert>
+#include <iostream>
+#include <vector>
 
 constexpr int STROBE_R = 166;
 
@@ -65,19 +67,21 @@ public:
     int pos_begin;
     int cur_flags;
 
-    static Strobe128 new_instance(char* protocol_label);
+    static Strobe128 new_instance(std::string protocol_label);
 
     void run_f();
 
-    void absorb(uint8_t* data, size_t data_len);
+    void absorb(std::vector<uint8_t>& data);
 
-    void squeeze(uint8_t* data, size_t data_len);
+    void squeeze(std::vector<uint8_t>& data);
 
     void begin_op(int flags, bool more);
 
-    void meta_ad(char* data, bool more);
+    void meta_ad(std::vector<uint8_t>& data, bool more);
 
-    void ad(char* data, bool more);
+    void ad(std::vector<uint8_t>& data, bool more);
 
-    void prf(uint8_t* data, size_t data_len, bool more);
+    void prf(std::vector<uint8_t>& data, bool more);
 };
+
+std::vector<uint8_t> str_to_u8(const std::string str);

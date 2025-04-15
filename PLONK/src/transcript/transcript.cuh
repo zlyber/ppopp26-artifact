@@ -1,54 +1,32 @@
 #pragma once
-#include <cstdint>
-#include <cstring>
-#include "PLONK/src/transcript/strobe.h"
-#include "PLONK/src/serialize.cuh"
-
+#include "strobe.h"
+#include "../serialize.cuh"
 
 #define MERLIN_PROTOCOL_LABEL "Merlin v1.0"
+
+std::vector<uint8_t> encode_usize_as_u32(size_t x);
+
+SyncedMemory deserialize(std::vector<uint8_t> x, size_t length);
 
 class Transcript {
 public:
     Strobe128 strobe;
-    Transcript(char* label) {
-        strobe.new_instance(MERLIN_PROTOCOL_LABEL);
-        append_message("dom-sep", reinterpret_cast<uint8_t*>(label));
-    }
-
-    void append_message(char* label, uint8_t* message) {
-        uint32_t data_len = static_cast<uint32_t>(strlen(label));
-        strobe.meta_ad(label, false);
-        strobe.meta_ad(reinterpret_cast<char*>(&data_len), true);
-        strobe.ad(reinterpret_cast<char*>(message), false);
-    }
-
-    void append_pi(char* label, SyncedMemory& item, size_t pos) {
-        uint8_t* buf = nullptr;
-        serialize(buf, BTreeMap::new_instance(item,pos));
-        append_message(label, buf);
-        free(buf);
-    }
+    Transcript(std::string label);
     
-    template <typename T>
-    void append(char* label, T& item) {
-        uint8_t* buf = nullptr;
-        serialize(buf, item);
-        append_message(label, buf);
-        free(buf);
-    }
+    void append_message(std::string label, std::string message);
 
-    void challenge_bytes(char* label, char* dest, size_t dest_len) {
-        strobe.meta_ad(label, false);
-        strobe.meta_ad(reinterpret_cast<char*>(&dest_len), true);
-        strobe.prf(reinterpret_cast<uint8_t*>(dest), dest_len, false);
-    }
+    void append_message_chunk(std::string message);
 
-    SyncedMemory& challenge_scalar(char* label) {
-        size_t size = fr::MODULUS_BITS / 8;
-        uint8_t* buf = static_cast<uint8_t*>(calloc(size, sizeof(uint8_t)));
-        challenge_bytes(label, reinterpret_cast<char*>(buf), size);
-        SyncedMemory& c_s = deserialize(buf, size);
-        free(buf);
-        return c_s;
-    }
+    void append_pi(std::string label, SyncedMemory item, size_t pos);
+    
+    void append(char* label, SyncedMemory item);
+
+    void append_chunk(const char* label, AffinePointG1 item, int idx);
+
+    void append(char* label, AffinePointG1 item);
+
+    void challenge_bytes(std::string label, std::vector<uint8_t>& dest);
+
+    SyncedMemory challenge_scalar(std::string label);
 };
+

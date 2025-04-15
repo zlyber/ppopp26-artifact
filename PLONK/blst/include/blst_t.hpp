@@ -26,7 +26,7 @@ extern "C" {
 #include "vect.h"
 }
 #include "bytes.h"
-
+#include <cstdint>
 #undef launder // avoid conflict with C++ >=17
 
 #ifdef __GNUC__

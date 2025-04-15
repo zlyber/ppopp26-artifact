@@ -1,7 +1,7 @@
 #pragma once
 
-#include "PLONK/utils/mont/cuda/ff/bls12-377.hpp"
-#include "PLONK/utils/mont/cuda/ff/bls12-381.hpp"
+#include "ff/bls12-377.hpp"
+#include "ff/bls12-381.hpp"
 
 namespace cuda{
     using fr = BLS12_381_Fr_G1;
@@ -16,5 +16,5 @@ namespace cuda{
     constexpr int block_work_size() { return thread_work_size() * num_threads(); }
 
     template <typename T>
-    int num_uint64(T a) { return (a.bit_length() + 63)/64;}
+    int num_uint64(T* a) { return (T::bit_length() + 63)/64;}
 }

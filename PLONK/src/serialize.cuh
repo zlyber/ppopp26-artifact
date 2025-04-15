@@ -4,9 +4,9 @@
 #include <stdexcept>
 #include <cassert>
 #include <type_traits>
-#include "PLONK/src/transcript/flags.hpp"
-#include "PLONK/src/structure.cuh"
-#include "PLONK/src/bls12_381/fr.hpp"
+#include "transcript/flags.hpp"
+#include "structure.cuh"
+#include "bls12_381/fr.cuh"
 using namespace caffe; 
 
 // type traits
@@ -28,54 +28,41 @@ struct is_affine_point_g1<AffinePointG1> : std::true_type {};
 template <>
 struct is_btree_map<BTreeMap> : std::true_type {};
 
-template<typename T>
-void serialize(uint8_t* buffer, T& item, int flag = EmptyFlags::BIT_SIZE) {
+template<typename T, typename flag>
+void serialize(std::vector<uint8_t>& buffer, T item, flag flags = EmptyFlags(0), size_t offset = 0) {
     if constexpr(is_synced_memory<T>::value) {
-        assert(flag <= 8 && "not enough space");
-        SyncedMemory& item_base = to_base(item);
+        assert(flags.BIT_SIZE <= 8 && "not enough space");
+        SyncedMemory item_base = to_base(item);
         void* item_ = item_base.mutable_cpu_data();
-        memcpy(buffer, item_, item.size());
-        buffer[-1] |= flag;
+        memcpy(buffer.data() + offset, item_, item.size());
+        buffer.back() |= flags.u8_bitmask();
         return;
     }
     else if constexpr(std::is_same_v<T, uint64_t>) {
-        memcpy(buffer, &item, 8);
+        memcpy(buffer.data() + offset, &item, 8);
         return;
     }
     else if constexpr(is_btree_map<T>::value) {
         uint64_t len = 1;
-        serialize(buffer, len);
-        serialize(buffer + 8, item.pos);
-        serialize(buffer + 16, item.item);
+        serialize(buffer, len, EmptyFlags(0));
+        serialize(buffer, item.pos, EmptyFlags(0), 8);
+        serialize(buffer, item.item, EmptyFlags(0), 16);
         return;
     }
     else if constexpr(is_affine_point_g1<T>::value) {
         if (AffinePointG1::is_zero(item)) {
-            flag = SWFlags::infinity().flag;
-            serialize(buffer, fq::zero(), flag);
+            SWFlags flags = SWFlags::infinity();
+            serialize(buffer, fq::zero(), flags);
         } else {
-            SyncedMemory& a = to_base(item.y);
-            SyncedMemory& b = to_base(neg_mod(item.y));
-            flag = SWFlags::from_y_sign(gt_zkp(a, b)).flag;
-            serialize(buffer, item.x, flag);
+            SyncedMemory neg_a = neg_mod(item.y);
+            SyncedMemory a = to_base(item.y);
+            SyncedMemory b = to_base(neg_a);
+            SWFlags flags = SWFlags::from_y_sign(gt_zkp(a, b));
+            serialize(buffer, item.x, flags);
         }
         return;
     }
     else {
     throw std::runtime_error("unsupported type");
     }
-}
-
-// Deserialize function
-SyncedMemory& deserialize(uint8_t* x, size_t length) {
-    assert(EmptyFlags::BIT_SIZE <= 8 && "empty flags too large");
-
-    uint8_t aligned[64] = {0};
-    memcpy(aligned, x, length);
-    memset(aligned + length, 0, 64 - length);
-
-    SyncedMemory scalar_in_uint64(sizeof(uint64_t)*fr::Limbs);
-    void* scalar_ = scalar_in_uint64.mutable_cpu_data();
-    memcpy(scalar_, aligned, sizeof(scalar_in_uint64));
-    return to_mont(scalar_in_uint64);
 }

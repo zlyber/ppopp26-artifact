@@ -1,7 +1,7 @@
 #pragma once
 #include <array>
 #include <stdint.h>
-#include "PLONK/utils/mont/cuda/ff/bls12-381.hpp"
+#include "../../../../mont/cuda/ff/bls12-381.hpp"
 
 template <>
 struct NTTHyperParam<cuda::BLS12_381_Fr_G1> {

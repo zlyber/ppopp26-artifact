@@ -1,6 +1,6 @@
 #pragma once
 
-#include "cpu/ec/jacobian_t.hpp"
+#include "jacobian_t.hpp"
 
 template <
     class field_t,

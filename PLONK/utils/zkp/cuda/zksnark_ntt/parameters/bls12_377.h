@@ -1,7 +1,7 @@
 #pragma once
 #include <array>
 #include <cstdint>
-#include "PLONK/utils/mont/cuda/ff/bls12-377.hpp"
+#include "/../../../../mont/cuda/ff/bls12-377.hpp"
 template <>
 struct NTTHyperParam<cuda::BLS12_377_Fr_G1> {
   constexpr static const std::array<uint32_t, 8> group_gen = {
