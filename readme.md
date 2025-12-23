@@ -9,7 +9,7 @@
  
 
 ### TL;DR
-This artifact provides the minimal reproducible examples for *Pipelonk*’s segmentable operator library (sec.3 in the paper), including grand product, polynomial evaluation, polynomial division, and number-theoretic transforms (NTT). Due to the platform’s upload limit (≤ 600 MB), we were unable to include end-to-end instance or larger-scale inputs (sec.4 in the paper); the current provided input size can be $2^{22}$(128 MB) or $2^{24}$(512 MB).
+This artifact provides the minimal reproducible examples for *Pipelonk*’s segmentable operator library (sec.3 in the paper), including grand product, polynomial evaluation, polynomial division, and number-theoretic transforms (NTT).
 ### Remark
 - We have made every effort to ensure that the artifact's code correctly implements the logic and computational workload described in the paper. Nonetheless, it is provided as-is, without any guarantees, and should be independently validated before use in real systems.
 - The **cpu baseline** results for the missing operators reported in the paper were obtained using the [*arkworks*’ Rust implementation](https://github.com/ZK-Garage/plonk). This artifact re-implements the same logic but uses the high-performance [_blst_](https://github.com/supranational/blst) library, written in assembly and C, resulting in baseline performance that is approximately 25%–55% faster than the data reported in the paper.
