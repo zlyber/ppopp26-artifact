@@ -1,12 +1,13 @@
 **Table of Contents**
 
-- [[#TL;DR|TL;DR]]
-- [[#Remark|Remark]]
-- [[#Environment Requirements|Environment Requirements]]
-- [[#How to Run|How to Run]]
-	- [[#How to Run#Evaluate NTT|Evaluate NTT]]
-	- [[#How to Run#Evaluate Missing Operators|Evaluate Missing Operators]]
-- [[#Performance|Performance]]
+- [TL;DR](#tldr)
+- [Remark](#remark)
+- [Environment Requirements](#environment-requirements)
+- [How to Run](#how-to-run)
+  - [Evaluate NTT](#evaluate-ntt)
+  - [Evaluate Missing Operators](#evaluate-missing-operators)
+ 
+
 ### TL;DR
 This artifact provides the minimal reproducible examples for *Pipelonk*’s segmentable operator library (sec.3 in the paper), including grand product, polynomial evaluation, polynomial division, and number-theoretic transforms (NTT). Due to the platform’s upload limit (≤ 600 MB), we were unable to include end-to-end instance or larger-scale inputs (sec.4 in the paper); the current provided input size can be $2^{22}$(128 MB) or $2^{24}$(512 MB).
 ### Remark
