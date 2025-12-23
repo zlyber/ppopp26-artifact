@@ -113,9 +113,9 @@ __device__ __forceinline__ fr_t get_intermediate_root(
 }
 
 template <typename fr_t>
-__launch_bounds__(1024) __global__ void pad_and_transpose(fr_t* d_in, fr_t* d_out) {
+__launch_bounds__(1024) __global__ void pad_and_transpose(fr_t* d_in, fr_t* d_out, int lambda) {
   index_t idx = threadIdx.x + blockDim.x * (index_t)blockIdx.x;
-  d_out[idx<<3] = d_in[idx];
+  d_out[idx<<lambda] = d_in[idx];
 }
 
 template <typename fr_t>

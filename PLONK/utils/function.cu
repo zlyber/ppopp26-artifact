@@ -354,8 +354,8 @@ void Ntt_coset::init(SyncedMemory input, int lg_domain_size, int chunk_id, bool 
     cuda::ntt_zkp_coset_init_cuda(input, Params, lg_domain_size, is_intt, chunk_id, stream);
 }
 
-void Ntt_coset::init_with_bitrev(SyncedMemory input, int lg_domain_size, bool is_intt, cudaStream_t stream) {
-    cuda::ntt_zkp_coset_init_with_bitrev_cuda(input, Params, lg_domain_size, is_intt, stream);
+void Ntt_coset::init_and_forward(SyncedMemory input, SyncedMemory output, int lg_domain_size, int chunk_id, int lambda, int stage, bool is_intt, cudaStream_t stream) {
+    cuda::ntt_zkp_coset_init_and_step1_cuda(input, output, Params, lg_domain_size, chunk_id, lambda, stage, is_intt, stream);
 }
 
 void Ntt_coset::forward1(SyncedMemory input, int lg_domain_size, int stage, int chunk_id, cudaStream_t stream) {
@@ -366,8 +366,8 @@ void Ntt_coset::forward2(SyncedMemory input, int lg_domain_size, int stage, int 
     cuda::ntt_zkp_coset_step2_cuda(input, Params, lg_domain_size, false, stage, chunk_id, stream);
 }
 
-void Ntt_coset::forward3(SyncedMemory input, int lg_domain_size, int stage, int chunk_id, cudaStream_t stream) {
-    cuda::ntt_zkp_coset_step3_cuda(input, Params, lg_domain_size, false, stage, chunk_id, stream);
+void Ntt_coset::forward3(SyncedMemory input, SyncedMemory output, int lg_domain_size, int stage, int chunk_id, int lambda, cudaStream_t stream) {
+    cuda::ntt_zkp_coset_step3_cuda(input, output, Params, lg_domain_size, false, stage, chunk_id, lambda, stream);
 }
 
 Intt_coset::Intt_coset(int domain_size, int coset_size, cudaStream_t stream)
@@ -385,8 +385,8 @@ void Intt_coset::forward2(SyncedMemory input, int lg_domain_size, int stage, int
     cuda::ntt_zkp_coset_step2_cuda(input, Params, lg_domain_size, true, stage, chunk_id, stream);
 }
 
-void Intt_coset::forward3(SyncedMemory input, int lg_domain_size, int stage, int chunk_id, cudaStream_t stream) {
-    cuda::ntt_zkp_coset_step3_cuda(input, Params, lg_domain_size, true, stage, chunk_id, stream);
+void Intt_coset::forward3(SyncedMemory input, SyncedMemory output, int lg_domain_size, int stage, int chunk_id, int lambda, cudaStream_t stream) {
+    cuda::ntt_zkp_coset_step3_cuda(input, output, Params, lg_domain_size, true, stage, chunk_id, lambda, stream);
 }
 
 SyncedMemory multi_scalar_mult(SyncedMemory points, SyncedMemory scalars, cudaStream_t stream){
@@ -486,6 +486,7 @@ uint64_t bit_rev_64(uint64_t i, uint32_t nbits) {
     }
     return rev;
 }
+
 
 uint32_t bit_rev(uint32_t i, uint32_t nbits) {
     if (sizeof(i) == 4 || nbits <= 32) {

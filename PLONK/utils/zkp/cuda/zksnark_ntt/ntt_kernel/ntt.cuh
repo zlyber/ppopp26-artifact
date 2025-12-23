@@ -55,11 +55,10 @@ void LDE_powers(
     LDE_distribute_powers<<<chunk_size / 512, 512, sharedMemorySize>>>(
         inout, lg_blowup, lg_domain_size, 0, bitrev, pggp, ext_pow);
 }
-  
 
 template <typename fr_t>
-void LDE_powers_and_pad(
-    fr_t* inout,
+void LDE_powers_chunk(
+    fr_t* in,
     fr_t* pggp,
     bool bitrev,
     uint32_t lg_domain_size,
@@ -72,14 +71,42 @@ void LDE_powers_and_pad(
   size_t offset = chunk_id * chunk_size;
   if (chunk_size < WARP_SZ)
     LDE_distribute_powers<<<1, chunk_size, 0, stream>>>(
-      inout, lg_blowup, lg_domain_size, offset, bitrev, pggp, ext_pow);
+      in, lg_blowup, lg_domain_size, offset, bitrev, pggp, ext_pow);
   else if (chunk_size < 512)
     LDE_distribute_powers<<<chunk_size / WARP_SZ, WARP_SZ, 0, stream>>>(
-        inout, lg_blowup, lg_domain_size, offset, bitrev, pggp, ext_pow);
+        in, lg_blowup, lg_domain_size, offset, bitrev, pggp, ext_pow);
   else {
     LDE_distribute_powers<<<chunk_size / 512, 512, 0, stream>>>(
-        inout, lg_blowup, lg_domain_size, offset, bitrev, pggp, ext_pow);
-    // pad_and_transpose<<<chunk_size / 512, 512, 0>>>(in, out);
+        in, lg_blowup, lg_domain_size, offset, bitrev, pggp, ext_pow);
+  }
+}
+
+
+template <typename fr_t>
+void LDE_powers_and_pad(
+    fr_t* in,
+    fr_t* out,
+    fr_t* pggp,
+    bool bitrev,
+    uint32_t lg_domain_size,
+    uint32_t lg_chunk_size,
+    uint32_t lg_blowup,
+    int chunk_id,
+    int lambda,
+    cudaStream_t stream,
+    bool ext_pow = false) {
+  size_t chunk_size = (size_t)1 << lg_chunk_size;
+  size_t offset = chunk_id * chunk_size;
+  if (chunk_size < WARP_SZ)
+    LDE_distribute_powers<<<1, chunk_size, 0, stream>>>(
+      in, lg_blowup, lg_domain_size, offset, bitrev, pggp, ext_pow);
+  else if (chunk_size < 512)
+    LDE_distribute_powers<<<chunk_size / WARP_SZ, WARP_SZ, 0, stream>>>(
+        in, lg_blowup, lg_domain_size, offset, bitrev, pggp, ext_pow);
+  else {
+    LDE_distribute_powers<<<chunk_size / 512, 512, 0, stream>>>(
+        in, lg_blowup, lg_domain_size, offset, bitrev, pggp, ext_pow);
+    pad_and_transpose<<<chunk_size / 512, 512, 0, stream>>>(in, out, lambda);
   }
 }
 
@@ -208,7 +235,7 @@ void NTT_LDE_init(
 
   switch (order) {
     case InputOutputOrder::NN:
-      // bit_rev(d_inout, d_inout, lg_domain_size);
+      bit_rev(d_inout, d_inout, lg_chunk_size);
       bitrev = true;
       algorithm = Algorithm::CT;
       break;
@@ -229,7 +256,7 @@ void NTT_LDE_init(
   }
 
   if (!intt)
-    LDE_powers_and_pad(
+    LDE_powers_chunk(
       d_inout,
       partial_group_gen_powers,
       bitrev,
@@ -240,7 +267,7 @@ void NTT_LDE_init(
       stream,
       coset_ext_pow);
   else
-    LDE_powers_and_pad(
+    LDE_powers_chunk(
       d_inout,
       partial_group_gen_powers,
       !bitrev,
@@ -274,10 +301,23 @@ void NTT_LDE_step1(
   // results in a considerable performance gain.
 
   const bool intt = direction == Direction::inverse;
-
-  // 20 < lg_domain_size < 30
+  bit_rev(d_inout, d_inout, lg_chunk_size, stream);
+  CUDA_CHECK(cudaGetLastError());
+  // int step = lg_chunk_size / 2;
+  // int rem = lg_chunk_size % 2;
   int step = lg_domain_size / 3;
   int rem = lg_domain_size % 3;
+  LDE_powers_chunk(
+    d_inout,
+    partial_group_gen_powers,
+    true,
+    lg_domain_size,
+    lg_chunk_size,
+    0,
+    chunk_id,
+    stream,
+    coset_ext_pow);
+  
   CTkernel_(
       step,
       d_inout,
@@ -292,17 +332,38 @@ void NTT_LDE_step1(
       stage,
       chunk_id,
       stream);
+  CUDA_CHECK(cudaGetLastError());
+  CTkernel_(
+    step,
+    d_inout,
+    partial_twiddles,
+    radix_twiddles,
+    radix_middles,
+    partial_group_gen_powers,
+    Domain_size_inverse,
+    lg_domain_size,
+    lg_chunk_size,
+    intt,
+    stage + step,
+    chunk_id,
+    stream);
+  CUDA_CHECK(cudaGetLastError());
 }
 
 template <typename fr_t>
-void NTT_LDE_init_with_bitrev(
-    fr_t* d_inout,
+void NTT_LDE_init_and_step1(
+    fr_t* d_in,
+    fr_t* d_out,
     fr_t* partial_twiddles,
     fr_t* radix_twiddles,
     fr_t* radix_middles,
     fr_t* partial_group_gen_powers,
     fr_t* Domain_size_inverse,
     uint32_t lg_domain_size,
+    uint32_t lg_chunk_size,
+    int stage,
+    int chunk_id,
+    int lambda,
     InputOutputOrder order,
     Direction direction,
     cudaStream_t stream,
@@ -317,7 +378,7 @@ void NTT_LDE_init_with_bitrev(
 
   switch (order) {
     case InputOutputOrder::NN:
-      bit_rev(d_inout, d_inout, lg_domain_size, stream);
+      bit_rev(d_in, d_in, lg_chunk_size, stream);
       bitrev = true;
       algorithm = Algorithm::CT;
       break;
@@ -336,18 +397,56 @@ void NTT_LDE_init_with_bitrev(
     default:
       assert(false);
   }
-
+  
   if (!intt)
     LDE_powers_and_pad(
-      d_inout,
+      d_in,
+      d_out,
       partial_group_gen_powers,
       bitrev,
       lg_domain_size,
-      lg_domain_size,
+      lg_chunk_size,
       0,
-      0,
+      chunk_id,
+      lambda,
       stream,
       coset_ext_pow);
+
+  int step = lg_domain_size / 3;
+  int rem = lg_domain_size % 3;
+
+  // int step = 8;
+  // int rem = 8;
+  CTkernel_(
+      step,
+      d_out,
+      partial_twiddles,
+      radix_twiddles,
+      radix_middles,
+      partial_group_gen_powers,
+      Domain_size_inverse,
+      lg_domain_size,
+      lg_chunk_size + lambda,
+      intt,
+      stage,
+      chunk_id,
+      stream);
+
+  CTkernel_(
+      step,
+      d_out,
+      partial_twiddles,
+      radix_twiddles,
+      radix_middles,
+      partial_group_gen_powers,
+      Domain_size_inverse,
+      lg_domain_size,
+      lg_chunk_size + lambda,
+      intt,
+      stage+step,
+      chunk_id,
+      stream);
+
 }
 
 template <typename fr_t>
@@ -371,69 +470,34 @@ void NTT_LDE_step2(
   // results in a considerable performance gain.
 
   const bool intt = direction == Direction::inverse;
-  bool bitrev;
-  Algorithm algorithm;
+  bool bitrev = true;
 
-  switch (order) {
-    case InputOutputOrder::NN:
-      // bit_rev(d_inout, d_inout, lg_domain_size);
-      bitrev = true;
-      algorithm = Algorithm::CT;
-      break;
-    case InputOutputOrder::NR:
-      bitrev = false;
-      algorithm = Algorithm::GS;
-      break;
-    case InputOutputOrder::RN:
-      bitrev = true;
-      algorithm = Algorithm::CT;
-      break;
-    case InputOutputOrder::RR:
-      bitrev = true;
-      algorithm = Algorithm::GS;
-      break;
-    default:
-      assert(false);
+  bit_rev(d_inout, d_inout, lg_chunk_size, stream);
+  // 20 < lg_domain_size < 30
+  int step = lg_domain_size / 3;
+  int rem = lg_domain_size % 3;
+  
+  CTkernel_(
+    step + (lg_domain_size == 29 ? 1 : 0),
+    d_inout,
+    partial_twiddles,
+    radix_twiddles,
+    radix_middles,
+    partial_group_gen_powers,
+    Domain_size_inverse,
+    lg_domain_size,
+    lg_chunk_size,
+    intt,
+    stage,
+    chunk_id,
+    stream);
   }
 
-  switch (algorithm) {
-    case Algorithm::GS:
-      GS_NTT(
-          d_inout,
-          lg_domain_size,
-          intt,
-          partial_twiddles,
-          radix_twiddles,
-          radix_middles,
-          partial_group_gen_powers,
-          Domain_size_inverse);
-      break;
-    case Algorithm::CT:
-      // 20 < lg_domain_size < 30
-      int step = lg_domain_size / 3;
-      int rem = lg_domain_size % 3;
-      
-      CTkernel_(
-          step + (lg_domain_size == 29 ? 1 : 0),
-          d_inout,
-          partial_twiddles,
-          radix_twiddles,
-          radix_middles,
-          partial_group_gen_powers,
-          Domain_size_inverse,
-          lg_domain_size,
-          lg_chunk_size,
-          intt,
-          stage,
-          chunk_id,
-          stream);
-  }
-
-}
 
 template <typename fr_t>
 void NTT_LDE_step3(
-    fr_t* d_inout,
+    fr_t* d_in,
+    fr_t* d_out,
     fr_t* partial_twiddles,
     fr_t* radix_twiddles,
     fr_t* radix_middles,
@@ -443,6 +507,7 @@ void NTT_LDE_step3(
     uint32_t lg_chunk_size,
     int stage,
     int chunk_id,
+    int lambda,
     InputOutputOrder order,
     Direction direction,
     cudaStream_t stream = (cudaStream_t)0,
@@ -457,10 +522,11 @@ void NTT_LDE_step3(
   // 20 < lg_domain_size < 30
   int step = lg_domain_size / 3;
   int rem = lg_domain_size % 3;
-
-  CTkernel_(
-      step + (lg_domain_size == 29 ? 1 : rem),
-      d_inout,
+      
+  CTkernel_lambda(
+      step,
+      d_in,
+      d_out,
       partial_twiddles,
       radix_twiddles,
       radix_middles,
@@ -471,21 +537,9 @@ void NTT_LDE_step3(
       intt,
       stage,
       chunk_id,
+      lambda,
       stream);
 
-
-  if (intt)
-    LDE_powers(
-        d_inout,
-        partial_group_gen_powers,
-        !bitrev,
-        lg_domain_size,
-        lg_chunk_size,
-        0,
-        coset_ext_pow);
-
-  if (order == InputOutputOrder::RR)
-    bit_rev(d_inout, d_inout, lg_domain_size);
 }
 
 template <typename fr_t>
@@ -529,6 +583,7 @@ void ntt_step1(fr_t* inout, fr_t* partial_twiddles, fr_t* radix_twiddles, fr_t* 
     stage,
     chunk_id,
     stream);
+    CUDA_CHECK(cudaGetLastError());
 }
 
 template <typename fr_t>
@@ -555,6 +610,7 @@ void ntt_step2(fr_t* inout, fr_t* partial_twiddles, fr_t* radix_twiddles, fr_t* 
     stage,
     chunk_id,
     stream);
+  CUDA_CHECK(cudaGetLastError());
 }
 
 template <typename fr_t>
@@ -765,7 +821,7 @@ void ntt_kcolumn_step1(
   // int step = (i_size +k) / 2;
   // int rem = (i_size +k) % 2;
   bit_rev(inout, inout, i_size + k, stream);
-  CUDA_CHECK(cudaDeviceSynchronize());
+
   CTkernel(
       step,
       inout,
@@ -778,7 +834,7 @@ void ntt_kcolumn_step1(
       intt,
       stage,
       stream);
-  CUDA_CHECK(cudaDeviceSynchronize());
+
   CTkernel(
       step + (lg_domain_size == 29 ? 1 : 0),
       inout,
@@ -791,7 +847,7 @@ void ntt_kcolumn_step1(
       intt,
       stage,
       stream);
-      CUDA_CHECK(cudaDeviceSynchronize());
+
 }
 
 template <typename fr_t>

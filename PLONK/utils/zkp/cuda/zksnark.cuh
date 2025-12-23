@@ -82,13 +82,13 @@ namespace cuda
 
     void ntt_zkp_coset_init_cuda(SyncedMemory inout, SyncedMemory params, int lg_domain_size, bool is_intt, int stage, cudaStream_t stream = (cudaStream_t)0);
 
-    void ntt_zkp_coset_init_with_bitrev_cuda(SyncedMemory inout, SyncedMemory params, int lg_domain_size, bool is_intt, cudaStream_t stream = (cudaStream_t)0);
+    void ntt_zkp_coset_init_and_step1_cuda(SyncedMemory in, SyncedMemory out, SyncedMemory params, int lg_domain_size, int chunk_id, int lambda, int stage, bool is_intt, cudaStream_t stream = (cudaStream_t)0);
     
     void ntt_zkp_coset_step1_cuda(SyncedMemory input, SyncedMemory params, int lg_domain_size, bool is_intt, int stage, int chunk_id, cudaStream_t stream = (cudaStream_t)0);
     
     void ntt_zkp_coset_step2_cuda(SyncedMemory input, SyncedMemory params, int lg_domain_size, bool is_intt, int stage, int chunk_id, cudaStream_t stream = (cudaStream_t)0);
 
-    void ntt_zkp_coset_step3_cuda(SyncedMemory input, SyncedMemory params, int lg_domain_size, bool is_intt, int stage, int chunk_id, cudaStream_t stream = (cudaStream_t)0);
+    void ntt_zkp_coset_step3_cuda(SyncedMemory input, SyncedMemory output, SyncedMemory params, int lg_domain_size, bool is_intt, int stage, int chunk_id, int lambda, cudaStream_t stream = (cudaStream_t)0);
 
     SyncedMemory make_tensor(SyncedMemory input, uint64_t pad_len);
 

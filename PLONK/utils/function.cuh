@@ -120,10 +120,10 @@ public:
     Ntt_coset(int domain_size, int coset_size);
 
     void init(SyncedMemory input, int lg_domain_size, int chunk_id, bool is_intt = false, cudaStream_t stream = (cudaStream_t)0);
-    void init_with_bitrev(SyncedMemory input, int lg_domain_size, bool is_intt = false, cudaStream_t stream = (cudaStream_t)0);
+    void init_and_forward(SyncedMemory input, SyncedMemory output, int lg_domain_size, int chunk_id, int lambda, int stage, bool is_intt, cudaStream_t stream = (cudaStream_t)0);
     void forward1(SyncedMemory input, int lg_domain_size, int stage, int chunk_id, cudaStream_t stream = (cudaStream_t)0);
     void forward2(SyncedMemory input, int lg_domain_size, int stage, int chunk_id, cudaStream_t stream = (cudaStream_t)0);
-    void forward3(SyncedMemory input, int lg_domain_size, int stage, int chunk_id, cudaStream_t stream = (cudaStream_t)0);
+    void forward3(SyncedMemory input, SyncedMemory output, int lg_domain_size, int stage, int chunk_id, int lambda, cudaStream_t stream = (cudaStream_t)0);
 };
 
 class Intt_coset {
@@ -136,7 +136,7 @@ public:
     void init(SyncedMemory input, int lg_domain_size, int chunk_id, bool is_intt = true, cudaStream_t stream = (cudaStream_t)0);
     void forward1(SyncedMemory input, int lg_domain_size, int stage, int chunk_id, cudaStream_t stream = (cudaStream_t)0);
     void forward2(SyncedMemory input, int lg_domain_size, int stage, int chunk_id, cudaStream_t stream = (cudaStream_t)0);
-    void forward3(SyncedMemory input, int lg_domain_size, int stage, int chunk_id, cudaStream_t stream = (cudaStream_t)0);
+    void forward3(SyncedMemory input, SyncedMemory output, int lg_domain_size, int stage, int chunk_id, int lambda, cudaStream_t stream = (cudaStream_t)0);
 
 };
 
@@ -199,42 +199,20 @@ void bit_rev_step2_worker(
 }
 
 template <typename fr>
-void bit_rev_step3_worker(
-    fr* d_out,
+void bit_rev_step2_worker_chunk(
+    std::vector<SyncedMemory> d_out,
     fr* d_in,
     uint32_t* map,
     uint64_t idx,
     uint64_t start_idx,
-    uint64_t end_idx) {
-
+    uint64_t end_idx,
+    uint64_t bound) {
+    
     for (uint64_t i = start_idx; i < end_idx; ++i) {
-        d_out[map[idx + i]] = d_in[i];
-    }
-}
-
-template <typename fr>
-void pad_and_transpose(
-    fr* d_out,
-    const fr* d_in,
-    int lg_chunk,
-    uint64_t idx) {
-
-    uint64_t N = 1 << lg_chunk;
-    uint32_t num_threads = std::thread::hardware_concurrency();  // 获取硬件并发线程数
-    // num_threads = 1 << (static_cast<int>(std::log2(num_threads)));
-    num_threads = 32;
-    uint32_t chunk_size = N / num_threads;
-
-    std::vector<std::thread> threads;
-
-    for (uint32_t t = 0; t < num_threads; ++t) {
-        uint64_t start_idx =  idx + t * chunk_size;
-        uint64_t end_idx = (t == num_threads - 1) ? N + idx : start_idx + chunk_size;
-        threads.push_back(std::thread(pad_transpose_worker<fr>, d_out, d_in, start_idx, end_idx));
-    }
-
-    for (auto& t : threads) {
-        t.join();
+        uint32_t index = map[idx+i];
+        int target_out = index/bound;
+        fr* out_ = reinterpret_cast<fr*>(d_out[target_out].mutable_cpu_data());
+        out_[index%bound] = d_in[i];
     }
 }
 
@@ -245,25 +223,20 @@ void bit_rev_step1_parallel(
     fr* d_in,
     uint32_t* map,
     int lg_N,
+    int num_threads,
     uint64_t idx) {
 
     uint64_t N = 1 << lg_N;
-    uint32_t num_threads = std::thread::hardware_concurrency();  // 获取硬件并发线程数
-    // num_threads = 1 << (static_cast<int>(std::log2(num_threads)));
-    // num_threads = 8;
-    num_threads = 32;
     uint32_t chunk_size = N / num_threads;
 
     std::vector<std::thread> threads;
 
-    // 启动多个线程来并行执行比特反转置换
     for (uint32_t t = 0; t < num_threads; ++t) {
         uint64_t start_idx = t * chunk_size;
         uint64_t end_idx = (t == num_threads - 1) ? N : start_idx + chunk_size;
         threads.push_back(std::thread(bit_rev_step1_worker<fr>, d_out, d_in, map, idx, start_idx, end_idx));
     }
-
-    // 等待所有线程完成
+    
     for (auto& t : threads) {
         t.join();
     }
@@ -275,23 +248,20 @@ void bit_rev_step2_parallel(
     fr* d_in,
     uint32_t* map,
     int lg_N,
+    int num_threads,
     uint64_t idx) {
 
     uint64_t N = 1 << lg_N;
-    uint32_t num_threads = std::thread::hardware_concurrency();  // 获取硬件并发线程数
-    num_threads = 2;
     uint32_t chunk_size = N / num_threads;
 
     std::vector<std::thread> threads;
 
-    // 启动多个线程来并行执行比特反转置换
     for (uint32_t t = 0; t < num_threads; ++t) {
         uint64_t start_idx =  t * chunk_size;
         uint64_t end_idx = (t == num_threads - 1) ? N : start_idx + chunk_size;
         threads.push_back(std::thread(bit_rev_step2_worker<fr>, d_out, d_in, map, idx, start_idx, end_idx));
     }
 
-    // 等待所有线程完成
     for (auto& t : threads) {
         t.join();
     }
@@ -310,94 +280,3 @@ void bit_rev_step2(
     bit_rev_step2_worker(d_out, d_in, map, idx, 0, N-1);
    
 }
-
-template <typename fr>
-void bit_rev_step3_parallel(
-    fr* d_out,
-    fr* d_in,
-    uint32_t* map,
-    int lg_N,
-    uint64_t idx) {
-
-    uint64_t N = 1 << lg_N;
-    uint32_t num_threads = std::thread::hardware_concurrency();  // 获取硬件并发线程数
-    // num_threads = 1 << (static_cast<int>(std::log2(num_threads)));
-    num_threads = 32;
-    uint32_t chunk_size = N / num_threads;
-
-    std::vector<std::thread> threads;
-
-    // 启动多个线程来并行执行比特反转置换
-    for (uint32_t t = 0; t < num_threads; ++t) {
-        uint64_t start_idx = t * chunk_size;
-        uint64_t end_idx = (t == num_threads - 1) ? N : start_idx + chunk_size;
-        threads.push_back(std::thread(bit_rev_step3_worker<fr>, d_out, d_in, map, idx, start_idx, end_idx));
-    }
-
-    // 等待所有线程完成
-    for (auto& t : threads) {
-        t.join();
-    }
-}
-
-void COSET_INTT(Intt_coset INTT, 
-    int lg_LDE,
-    int chunk_num,
-    std::vector<SyncedMemory> inout,
-    std::vector<SyncedMemory> global_buffer,
-    std::vector<SyncedMemory> cpu_buffer,
-    uint32_t* step1_map,
-    uint32_t* step2_map,
-    uint32_t* step3_map,
-    SyncedMemory cpu_map,
-    cudaStream_t stream1 = (cudaStream_t)0,
-    cudaStream_t stream2 = (cudaStream_t)0);
-
-void LDE_forward(Ntt_coset NTT, 
-    int lg_LDE,
-    SyncedMemory input,
-    SyncedMemory output,
-    std::vector<SyncedMemory> global_buffer,
-    std::vector<SyncedMemory> cpu_buffer,
-    uint32_t* step1_map,
-    uint32_t* step2_map,
-    uint32_t* step3_map,
-    SyncedMemory cpu_map,
-    SyncedMemory step1_in,
-    bool tail,
-    cudaStream_t stream1 = (cudaStream_t)0,
-    cudaStream_t stream2 = (cudaStream_t)0);
-
-void LDE_forward_chunk(Ntt_coset NTT, 
-    int lg_LDE,
-    int chunk_num,
-    std::vector<SyncedMemory> input,
-    SyncedMemory output,
-    std::vector<SyncedMemory> global_buffer,
-    std::vector<SyncedMemory> cpu_buffer,
-    uint32_t* step1_map,
-    uint32_t* step2_map,
-    uint32_t* step3_map,
-    SyncedMemory cpu_map,
-    SyncedMemory step1_in,
-    bool tail,
-    cudaStream_t stream1 = (cudaStream_t)0,
-    cudaStream_t stream2 = (cudaStream_t)0);
-
-void LDE_forward_with_commit(
-    Ntt_coset NTT, 
-    int lg_LDE,
-    SyncedMemory input,
-    std::vector<SyncedMemory> ck,
-    SyncedMemory chunk_msm_workspace, SyncedMemory chunk_msm_out,
-    std::vector<SyncedMemory> commits,
-    std::vector<SyncedMemory> global_buffer,
-    std::vector<SyncedMemory> cpu_buffer,
-    uint32_t* step1_map,
-    uint32_t* step2_map,
-    uint32_t* step3_map,
-    SyncedMemory cpu_map,
-    SyncedMemory step1_in,
-    bool tail,
-    cudaStream_t stream1 = (cudaStream_t)0,
-    cudaStream_t stream2 = (cudaStream_t)0);

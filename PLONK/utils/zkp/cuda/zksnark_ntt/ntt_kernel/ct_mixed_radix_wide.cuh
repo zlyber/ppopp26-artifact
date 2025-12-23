@@ -867,5 +867,141 @@ void CTkernel_(
 #undef NTT_CONFIGURATION
 #undef NTT_ARGUMENTS
 }
+
+template <typename fr_t>
+void CTkernel_lambda(
+    int iterations,
+    fr_t* d_in,
+    fr_t* d_out,
+    fr_t* partial_twiddles,
+    fr_t* radix7_twiddles,
+    fr_t* radix_middles,
+    fr_t* partial_group_gen_powers,
+    fr_t* Domain_size_inverse,
+    int lg_domain_size,
+    int lg_chunk_size,
+    bool is_intt,
+    int stage,
+    int chunk_id,
+    int lambda,
+    cudaStream_t stream = (cudaStream_t)0) {
+  assert(iterations <= 10);
+  size_t chunk_size = (size_t)1 << lg_chunk_size;
+  pad_and_transpose<<<chunk_size / 512, 512, 0, stream>>>(d_in, d_out, lambda);
+  const int radix = iterations < 6 ? 6 : iterations;
+
+  index_t num_threads = (index_t)1 << (lg_chunk_size + lambda - 1);
+  index_t block_size = 1 << (radix - 1);
+  index_t num_blocks;
+
+  block_size = (num_threads <= block_size) ? num_threads : block_size;
+  num_blocks = (num_threads + block_size - 1) / block_size;
+
+  assert(num_blocks == (unsigned int)num_blocks);
+
+  fr_t* d_radixX_twiddles = nullptr;
+  fr_t* d_intermediate_twiddles = nullptr;
+
+  unsigned int intermediate_twiddle_shift = 0;
+
+#define NTT_CONFIGURATION num_blocks, block_size, sizeof(fr_t) * block_size, stream
+
+#define NTT_ARGUMENTS                                                   \
+  radix, lg_domain_size, stage, iterations, chunk_id, d_out, partial_twiddles,  \
+      radix7_twiddles + 64 + 128 + 256 + 512, d_radixX_twiddles,        \
+      d_intermediate_twiddles, intermediate_twiddle_shift, is_intt,     \
+      Domain_size_inverse + lg_domain_size
+
+  switch (radix) {
+    case 6:
+      switch (stage) {
+        case 0:
+          _CT_NTT_<0><<<NTT_CONFIGURATION>>>(NTT_ARGUMENTS);
+          break;
+        case 6:
+          intermediate_twiddle_shift = ::std::max(12 - lg_domain_size, 0);
+          d_intermediate_twiddles = radix_middles;
+          _CT_NTT_<2><<<NTT_CONFIGURATION>>>(NTT_ARGUMENTS);
+          break;
+        case 12:
+          intermediate_twiddle_shift = ::std::max(18 - lg_domain_size, 0);
+          d_intermediate_twiddles = radix_middles + 64 * 64;
+          _CT_NTT_<2><<<NTT_CONFIGURATION>>>(NTT_ARGUMENTS);
+          break;
+        default:
+          _CT_NTT_<1><<<NTT_CONFIGURATION>>>(NTT_ARGUMENTS);
+          break;
+      }
+      break;
+    case 7:
+      d_radixX_twiddles = radix7_twiddles;
+      switch (stage) {
+        case 0:
+          _CT_NTT_<0><<<NTT_CONFIGURATION>>>(NTT_ARGUMENTS);
+          break;
+        case 7:
+          intermediate_twiddle_shift = ::std::max(14 - lg_domain_size, 0);
+          d_intermediate_twiddles = radix_middles + 64 * 64 + 4096 * 64;
+          _CT_NTT_<2><<<NTT_CONFIGURATION>>>(NTT_ARGUMENTS);
+          break;
+        default:
+          _CT_NTT_<1><<<NTT_CONFIGURATION>>>(NTT_ARGUMENTS);
+          break;
+      }
+      break;
+    case 8:
+      d_radixX_twiddles = radix7_twiddles + 64; // radix8_twiddles
+      switch (stage) {
+        case 0:
+          _CT_NTT_<0><<<NTT_CONFIGURATION>>>(NTT_ARGUMENTS);
+          break;
+        case 8:
+          intermediate_twiddle_shift = ::std::max(16 - lg_domain_size, 0);
+          d_intermediate_twiddles = radix_middles + 64 * 64 + 4096 * 64 +
+              128 * 128; // radix8_twiddles_8
+          _CT_NTT_<2><<<NTT_CONFIGURATION>>>(NTT_ARGUMENTS);
+          break;
+        default:
+          _CT_NTT_<1><<<NTT_CONFIGURATION>>>(NTT_ARGUMENTS);
+          break;
+      }
+      break;
+    case 9:
+      d_radixX_twiddles = radix7_twiddles + 64 + 128; // radix9_twiddles
+      switch (stage) {
+        case 0:
+          _CT_NTT_<0><<<NTT_CONFIGURATION>>>(NTT_ARGUMENTS);
+          break;
+        case 9:
+          intermediate_twiddle_shift = ::std::max(18 - lg_domain_size, 0);
+          d_intermediate_twiddles = radix_middles + 64 * 64 + 4096 * 64 +
+              128 * 128 + 256 * 256; // radix9_twiddles_9
+          _CT_NTT_<2><<<NTT_CONFIGURATION>>>(NTT_ARGUMENTS);
+          break;
+        default:
+          _CT_NTT_<1><<<NTT_CONFIGURATION>>>(NTT_ARGUMENTS);
+          break;
+      }
+      break;
+    case 10:
+      d_radixX_twiddles = radix7_twiddles + 64 + 128 + 256; // radix10_twiddles
+      switch (stage) {
+        case 0:
+          _CT_NTT_<0><<<NTT_CONFIGURATION>>>(NTT_ARGUMENTS);
+          break;
+        default:
+          _CT_NTT_<1><<<NTT_CONFIGURATION>>>(NTT_ARGUMENTS);
+          break;
+      }
+      break;
+    default:
+      assert(false);
+  }
+
+  // *stage += radix;
+#undef NTT_CONFIGURATION
+#undef NTT_ARGUMENTS
+}
+
 }
 

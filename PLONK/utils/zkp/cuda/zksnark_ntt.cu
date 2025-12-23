@@ -540,14 +540,17 @@ namespace cuda{
         InputOutputOrder::NN,
         is_intt ? Direction::inverse : Direction::forward,
         stream);
-      CUDA_CHECK(cudaGetLastError());
   }
 
   template<typename T>
-  static void ntt_zkp_coset_init_with_bitrev(
-    T* self,
+  static void ntt_zkp_coset_init_and_step1(
+    T* in,
+    T* out,
     T* params,
     int lg_domain_size,
+    int chunk_id,
+    int lambda,
+    int stage,
     bool is_intt,
     int64_t numel,
     cudaStream_t stream = (cudaStream_t)0) {
@@ -565,18 +568,23 @@ namespace cuda{
     auto rpm_ptr = params + L3;
     auto size_inverse_ptr = params + L4;
     
-    NTT_LDE_init_with_bitrev(
-        self,
+    NTT_LDE_init_and_step1(
+        in,
+        out,
         pt_ptr,
         rp_ptr,
         rpm_ptr,
         pggp_ptr,
         size_inverse_ptr,
         lg_domain_size,
+        lg_chunk_size,
+        stage,
+        chunk_id,
+        lambda,
         InputOutputOrder::NN,
         is_intt ? Direction::inverse : Direction::forward,
         stream);
-      CUDA_CHECK(cudaGetLastError());
+  CUDA_CHECK(cudaGetLastError());
   }
 
 
@@ -618,18 +626,20 @@ namespace cuda{
         InputOutputOrder::NN,
         is_intt ? Direction::inverse : Direction::forward,
         stream);
-      CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaGetLastError());
   }
 
   template<typename T>
   static void ntt_zkp_coset_step3(
-      T* self,
+      T* in,
+      T* out,
       T* params,
       int lg_domain_size,
       bool is_intt,
       bool is_coset, int64_t numel,
       int stage,
       int chunk_id,
+      int lambda,
       cudaStream_t stream = (cudaStream_t)0) {
     auto len = numel / fr_LIMBS;
     uint32_t lg_chunk_size = log2(len);
@@ -646,7 +656,8 @@ namespace cuda{
     auto size_inverse_ptr = params + L4;
     
     NTT_LDE_step3(
-        self,
+        in,
+        out,
         pt_ptr,
         rp_ptr,
         rpm_ptr,
@@ -656,6 +667,7 @@ namespace cuda{
         lg_chunk_size,
         stage,
         chunk_id,
+        lambda,
         InputOutputOrder::NN,
         is_intt ? Direction::inverse : Direction::forward,
         stream);
@@ -771,18 +783,23 @@ namespace cuda{
   ntt_zkp_coset_init(reinterpret_cast<fr*>(inout_), reinterpret_cast<fr*>(params_gpu), lg_domain_size, is_intt, numel, chunk_id, stream);
   }
 
-  void ntt_zkp_coset_init_with_bitrev_cuda(
-    SyncedMemory inout,
+  void ntt_zkp_coset_init_and_step1_cuda(
+    SyncedMemory in,
+    SyncedMemory out,
     SyncedMemory params,
     int lg_domain_size,
+    int chunk_id,
+    int lambda,
+    int stage,
     bool is_intt,
     cudaStream_t stream) {
 
-  void* inout_ = inout.mutable_gpu_data();
+  void* in_ = in.mutable_gpu_data();
+  void* out_ = out.mutable_gpu_data();
   void* params_gpu = params.mutable_gpu_data();
-  int64_t numel = inout.size()/sizeof(uint64_t);
+  int64_t numel = in.size()/sizeof(uint64_t);
 
-  ntt_zkp_coset_init_with_bitrev(reinterpret_cast<fr*>(inout_), reinterpret_cast<fr*>(params_gpu), lg_domain_size, is_intt, numel, stream);
+  ntt_zkp_coset_init_and_step1(reinterpret_cast<fr*>(in_), reinterpret_cast<fr*>(out_), reinterpret_cast<fr*>(params_gpu), lg_domain_size, chunk_id, lambda, stage, is_intt, numel, stream);
   }
 
   void ntt_zkp_coset_step1_cuda(
@@ -818,17 +835,20 @@ namespace cuda{
 
   void ntt_zkp_coset_step3_cuda(
     SyncedMemory input,
+    SyncedMemory output,
     SyncedMemory params,
     int lg_domain_size,
     bool is_intt,
     int stage,
     int chunk_id,
+    int lambda,
     cudaStream_t stream) {
   void* in_gpu = input.mutable_gpu_data();
+  void* out_gpu = output.mutable_gpu_data();
   void* params_gpu = params.mutable_gpu_data();
   int64_t numel = input.size()/sizeof(uint64_t);
       
-  ntt_zkp_coset_step3(reinterpret_cast<fr*>(in_gpu), reinterpret_cast<fr*>(params_gpu), lg_domain_size, is_intt, true, numel, stage, chunk_id, stream);
+  ntt_zkp_coset_step3(reinterpret_cast<fr*>(in_gpu), reinterpret_cast<fr*>(out_gpu), reinterpret_cast<fr*>(params_gpu), lg_domain_size, is_intt, true, numel, stage, chunk_id, lambda, stream);
   }
 
   void ntt_kcolumn_step1_cuda(
