@@ -221,7 +221,7 @@ void our_ntt(SyncedMemory input, int lg_N, int lg_i, int lg_j, int lg_k, int ste
 
     cudaEventElapsedTime(&milliseconds, start, stop);
 
-    std::cout << "out-ntt execution time: " << milliseconds<< " ms" << std::endl;
+    std::cout << "our-ntt execution time: " << milliseconds<< " ms" << std::endl;
 
     cudaEventDestroy(start);
     cudaEventDestroy(stop);

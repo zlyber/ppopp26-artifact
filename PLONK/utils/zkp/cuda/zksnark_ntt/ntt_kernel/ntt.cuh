@@ -378,7 +378,7 @@ void NTT_LDE_init_and_step1(
 
   switch (order) {
     case InputOutputOrder::NN:
-      bit_rev(d_in, d_in, lg_chunk_size, stream);
+      // bit_rev(d_in, d_in, lg_chunk_size, stream);
       bitrev = true;
       algorithm = Algorithm::CT;
       break;
