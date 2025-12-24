@@ -5,11 +5,12 @@
 - [Environment Requirements](#environment-requirements)
 - [How to Run](#how-to-run)
   - [Evaluate NTT](#evaluate-ntt)
+  - [Evaluate LDE](#evaluate-ntt)
   - [Evaluate Missing Operators](#evaluate-missing-operators)
  
 
 ### TL;DR
-This artifact provides the minimal reproducible examples for *Pipelonk*’s segmentable operator library (sec.3 in the paper), including grand product, polynomial evaluation, polynomial division, and number-theoretic transforms (NTT).
+This artifact provides the minimal reproducible examples for *Pipelonk*’s segmentable operator library (sec.3 in the paper), including grand product, polynomial evaluation, polynomial division, number theoretic transforms (NTT), and low degree extension (LDE).
 ### Remark
 - We have made every effort to ensure that the artifact's code correctly implements the logic and computational workload described in the paper. Nonetheless, it is provided as-is, without any guarantees, and should be independently validated before use in real systems.
 - The **cpu baseline** results for the missing operators reported in the paper were obtained using the [*arkworks*’ Rust implementation](https://github.com/ZK-Garage/plonk). This artifact re-implements the same logic but uses the high-performance [_blst_](https://github.com/supranational/blst) library, written in assembly and C, resulting in baseline performance that is approximately 25%–55% faster than the data reported in the paper.
@@ -30,8 +31,17 @@ Each test group includes both the *Pipelonk*-designed operator (_ours_) and the 
 5. make -j
 6. ./NTT
 ```
+#### Evaluate LDE
+```
+1. cd to the artifact directory
+2. cd LDE
+3. mkdir build & cd build
+4. cmake ..
+5. make -j
+6. ./LDE
+```
 #### Evaluate Missing Operators
-This test includes grand product, polynomial evaluation and polynomial division.
+This test includes the grand product, polynomial evaluation, and polynomial division.
 ```
 1. cd to the artifact directory
 2. cd miss_ops
