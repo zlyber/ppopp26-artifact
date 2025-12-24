@@ -170,7 +170,9 @@ int main() {
     for (int lg_k = 1; lg_k <= 4; ++lg_k) {
         int step2_thread;
 
-        if (lg_k == 1 || lg_k == 2) {
+        if (lg_k == 1) {
+            step2_thread = 1;
+        } else if (lg_k == 2){
             step2_thread = 2;
         } else if (lg_k == 3) {
             step2_thread = 4;
