@@ -89,6 +89,7 @@ public:
     void forward1(SyncedMemory input, int lg_domain_size, int stage, int chunk_id, cudaStream_t stream = (cudaStream_t)0);
     void forward2(SyncedMemory input, int lg_domain_size, int stage, int chunk_id, cudaStream_t stream = (cudaStream_t)0);
     void forward3(SyncedMemory input, int lg_domain_size, int stage, int chunk_id, cudaStream_t stream = (cudaStream_t)0);
+    void stage_no_rotate(SyncedMemory input, int lg_domain_size, int iterations, int stage, int chunk_id, cudaStream_t stream = (cudaStream_t)0);
     void forward1_kcolumn(SyncedMemory input, int lg_domain_size, int i_size, int k, int* stage, cudaStream_t stream = (cudaStream_t)0);
     void forward1_kcolumn_raw(uint64_t* input, int lg_domain_size, int64_t numel, int i_size, int k, int* stage, cudaStream_t stream = (cudaStream_t)0);
     void forward2_kcolumn(SyncedMemory input, int lg_domain_size, int i_size, int k, int* stage, cudaStream_t stream = (cudaStream_t)0);

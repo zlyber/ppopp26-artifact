@@ -192,6 +192,46 @@ namespace cuda{
   }
 
   template<typename T>
+  static void ntt_zkp_stage_no_rotate(
+      T* self,
+      T* params,
+      int lg_domain_size,
+      bool is_intt,
+      bool is_coset, int64_t numel, int iterations, int stage, int chunk_id,
+      cudaStream_t stream = (cudaStream_t)0) {
+    auto len = numel / fr_LIMBS;
+    uint32_t lg_chunk_size = log2(len);
+
+    auto L1 = WINDOW_NUM * WINDOW_SIZE;
+    auto L2 = 2 * L1;
+    auto L3 = L2 + (32 + 64 + 128 + 256 + 512);
+    auto L4 = L3 + (64 * 64 + 4096 * 64 + 128 * 128 + 256 * 256 + 512 * 512);
+
+    auto pt_ptr = params;
+    auto pggp_ptr = params + L1;
+    auto rp_ptr = params + L2;
+    auto rpm_ptr = params + L3;
+    auto size_inverse_ptr = params + L4;
+
+    ntt_stage_no_rotate(
+        self,
+        pt_ptr,
+        rp_ptr,
+        rpm_ptr,
+        pggp_ptr,
+        size_inverse_ptr,
+        lg_domain_size,
+        lg_chunk_size,
+        iterations,
+        stage,
+        chunk_id,
+        InputOutputOrder::NN,
+        is_intt ? Direction::inverse : Direction::forward,
+        stream);
+      CUDA_CHECK(cudaGetLastError());
+  }
+
+  template<typename T>
   static void ntt_zkp_step1_internal(
       T* self,
       T* params,
@@ -395,6 +435,22 @@ namespace cuda{
   void* params_gpu = params.mutable_gpu_data();
   int64_t numel = inout.size()/sizeof(uint64_t);
   ntt_zkp_step3(reinterpret_cast<fr*>(inout_), reinterpret_cast<fr*>(params_gpu), lg_domain_size, is_intt, false, numel, stage, chunk_id, stream);
+  }
+
+  void ntt_zkp_stage_no_rotate_cuda(
+    SyncedMemory inout,
+    SyncedMemory params,
+    int lg_domain_size,
+    bool is_intt,
+    int iterations,
+    int stage,
+    int chunk_id,
+    cudaStream_t stream) {
+  void* inout_ = inout.mutable_gpu_data();
+  CUDA_CHECK(cudaGetLastError());
+  void* params_gpu = params.mutable_gpu_data();
+  int64_t numel = inout.size()/sizeof(uint64_t);
+  ntt_zkp_stage_no_rotate(reinterpret_cast<fr*>(inout_), reinterpret_cast<fr*>(params_gpu), lg_domain_size, is_intt, false, numel, iterations, stage, chunk_id, stream);
   }
 
   void ntt_zkp_step1_internal_cuda(

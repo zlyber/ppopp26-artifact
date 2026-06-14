@@ -23,22 +23,81 @@ This artifact primarily targets x86_64 Linux systems equipped with NVIDIA Volta-
 ### How to Run
 Each test group includes both the *Pipelonk*-designed operator (_ours_) and the baseline implementation (_naive_), and each configuration is executed three times.
 #### Evaluate NTT
+Build:
+
 ```
-1. cd to the artifact directory
-2. cd NTT
-3. mkdir build & cd build
-4. cmake ..
-5. make -j
-6. ./NTT
+cd /path/to/ppopp26-artifact
+cmake -S NTT -B NTT/build
+cmake --build NTT/build -j
+cd NTT/build
 ```
+
+Evaluate Pipelonk NTT:
+
+```
+./NTT --bench-split 22
+./NTT --bench-split 24
+./NTT --bench-split 26
+```
+
+Evaluate the NTT baseline:
+
+```
+./NTT --bench-baseline 22
+./NTT --bench-baseline 24
+./NTT --bench-baseline 26
+```
+
+Optional correctness checks:
+
+```
+./NTT --check-split 22
+./NTT --check-baseline 22
+```
+
+Optional sweep for tuning `ours_ntt` across `k=1..8`:
+
+```
+./NTT --bench-sweep <lg_N> [reps]
+```
+
 #### Evaluate LDE
+Build:
+
 ```
-1. cd to the artifact directory
-2. cd LDE
-3. mkdir build & cd build
-4. cmake ..
-5. make -j
-6. ./LDE
+cd /path/to/ppopp26-artifact
+cmake -S LDE -B LDE/build
+cmake --build LDE/build -j
+cd LDE/build
+```
+
+Evaluate Pipelonk LDE for both `lambda=2` and `lambda=3`:
+
+```
+./LDE --bench 20
+./LDE --bench 22
+./LDE --bench 24
+```
+
+Evaluate the LDE baseline:
+
+```
+./LDE --bench-naive 20
+./LDE --bench-naive 22
+./LDE --bench-naive 24
+```
+
+To test only one expansion factor, pass `lambda` explicitly:
+
+```
+./LDE --bench <lg_N> <lambda>
+./LDE --bench-naive <lg_N> <lambda>
+```
+
+Optional sweep for tuning `our_lde` across `k=1..8`:
+
+```
+./LDE --bench-sweep <lg_N> <lambda> [reps]
 ```
 #### Evaluate Missing Operators
 This test includes the grand product, polynomial evaluation, and polynomial division.

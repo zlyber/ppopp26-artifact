@@ -477,6 +477,7 @@ __launch_bounds__(768, 1) __global__ void _CT_NTT_(
 #endif
   const index_t offset = chunk_id * blockDim.x * gridDim.x;
   const index_t tid = threadIdx.x + blockDim.x * (index_t)blockIdx.x;
+  const index_t global_tid = tid + offset;
 
   // const index_t inp_ntt_size = (index_t)1 << stage;
   // const index_t out_ntt_size = (index_t)1 << (stage + iterations - 1);
@@ -500,11 +501,14 @@ __launch_bounds__(768, 1) __global__ void _CT_NTT_(
 
   if (intermediate_mul == 1) {
     unsigned int diff_mask = (1 << (iterations - 1)) - 1;
-    unsigned int thread_ntt_idx = (tid & diff_mask) * 2;
+    unsigned int thread_ntt_idx = (global_tid & diff_mask) * 2;
     unsigned int nbits = MAX_LG_DOMAIN_SIZE - stage;
+    const index_t global_out_ntt_size = (index_t)1 << (stage + iterations - 1);
+    const index_t global_thread_ntt_pos =
+        (global_tid & (global_out_ntt_size - 1)) >> (iterations - 1);
 
-    index_t root_idx0 = bit_rev(thread_ntt_idx, nbits) * thread_ntt_pos;
-    index_t root_idx1 = thread_ntt_pos << (nbits - 1);
+    index_t root_idx0 = bit_rev(thread_ntt_idx, nbits) * global_thread_ntt_pos;
+    index_t root_idx1 = global_thread_ntt_pos << (nbits - 1);
 
     fr_t first_root, second_root;
     get_intermediate_roots(
@@ -515,14 +519,17 @@ __launch_bounds__(768, 1) __global__ void _CT_NTT_(
     r1 *= second_root;
   } else if (intermediate_mul == 2) {
     unsigned int diff_mask = (1 << (iterations - 1)) - 1;
-    unsigned int thread_ntt_idx = (tid& diff_mask) * 2;
+    unsigned int thread_ntt_idx = (global_tid & diff_mask) * 2;
     unsigned int nbits = intermediate_twiddle_shift + iterations;
+    const index_t global_out_ntt_size = (index_t)1 << (stage + iterations - 1);
+    const index_t global_thread_ntt_pos =
+        (global_tid & (global_out_ntt_size - 1)) >> (iterations - 1);
 
     index_t root_idx0 = bit_rev(thread_ntt_idx, nbits);
     index_t root_idx1 = bit_rev(thread_ntt_idx + 1, nbits);
 
-    fr_t t0 = d_intermediate_twiddles[(thread_ntt_pos << radix) + root_idx0];
-    fr_t t1 = d_intermediate_twiddles[(thread_ntt_pos << radix) + root_idx1];
+    fr_t t0 = d_intermediate_twiddles[(global_thread_ntt_pos << radix) + root_idx0];
+    fr_t t1 = d_intermediate_twiddles[(global_thread_ntt_pos << radix) + root_idx1];
 
     r0 *= t0;
     r1 *= t1;
@@ -623,6 +630,7 @@ __launch_bounds__(768, 1) __global__ void _CT_NTT_without_rotate(
 #endif
   const index_t offset = chunk_id * blockDim.x * gridDim.x;
   const index_t tid = threadIdx.x + blockDim.x * (index_t)blockIdx.x;
+  const index_t global_tid = tid + offset;
 
   // const index_t inp_ntt_size = (index_t)1 << stage;
   // const index_t out_ntt_size = (index_t)1 << (stage + iterations - 1);
@@ -646,11 +654,14 @@ __launch_bounds__(768, 1) __global__ void _CT_NTT_without_rotate(
 
   if (intermediate_mul == 1) {
     unsigned int diff_mask = (1 << (iterations - 1)) - 1;
-    unsigned int thread_ntt_idx = (tid & diff_mask) * 2;
+    unsigned int thread_ntt_idx = (global_tid & diff_mask) * 2;
     unsigned int nbits = MAX_LG_DOMAIN_SIZE - stage;
+    const index_t global_out_ntt_size = (index_t)1 << (stage + iterations - 1);
+    const index_t global_thread_ntt_pos =
+        (global_tid & (global_out_ntt_size - 1)) >> (iterations - 1);
 
-    index_t root_idx0 = bit_rev(thread_ntt_idx, nbits) * thread_ntt_pos;
-    index_t root_idx1 = thread_ntt_pos << (nbits - 1);
+    index_t root_idx0 = bit_rev(thread_ntt_idx, nbits) * global_thread_ntt_pos;
+    index_t root_idx1 = global_thread_ntt_pos << (nbits - 1);
 
     fr_t first_root, second_root;
     get_intermediate_roots(
@@ -660,16 +671,18 @@ __launch_bounds__(768, 1) __global__ void _CT_NTT_without_rotate(
     r0 *= first_root;
     r1 *= second_root;
   } else if (intermediate_mul == 2) {
-    // index_t thread_ntt_pos_step2 = ((tid + offset) & (out_ntt_size - 1)) >> (iterations - 1);
     unsigned int diff_mask = (1 << (iterations - 1)) - 1;
-    unsigned int thread_ntt_idx = (tid & diff_mask) * 2;
+    unsigned int thread_ntt_idx = (global_tid & diff_mask) * 2;
     unsigned int nbits = intermediate_twiddle_shift + iterations;
+    const index_t global_out_ntt_size = (index_t)1 << (stage + iterations - 1);
+    const index_t global_thread_ntt_pos =
+        (global_tid & (global_out_ntt_size - 1)) >> (iterations - 1);
 
     index_t root_idx0 = bit_rev(thread_ntt_idx, nbits);
     index_t root_idx1 = bit_rev(thread_ntt_idx + 1, nbits);
 
-    fr_t t0 = d_intermediate_twiddles[(thread_ntt_pos << radix) + root_idx0];
-    fr_t t1 = d_intermediate_twiddles[(thread_ntt_pos << radix) + root_idx1];
+    fr_t t0 = d_intermediate_twiddles[(global_thread_ntt_pos << radix) + root_idx0];
+    fr_t t1 = d_intermediate_twiddles[(global_thread_ntt_pos << radix) + root_idx1];
 
     r0 *= t0;
     r1 *= t1;
@@ -869,6 +882,98 @@ void CTkernel_(
 }
 
 template <typename fr_t>
+void CTkernel_no_rotate(
+    int iterations,
+    fr_t* d_inout,
+    fr_t* partial_twiddles,
+    fr_t* radix7_twiddles,
+    fr_t* radix_middles,
+    fr_t* partial_group_gen_powers,
+    fr_t* Domain_size_inverse,
+    int lg_domain_size,
+    int lg_chunk_size,
+    bool is_intt,
+    int stage,
+    int chunk_id,
+    cudaStream_t stream = (cudaStream_t)0) {
+  assert(iterations <= 10);
+  const int radix = iterations < 6 ? 6 : iterations;
+
+  index_t num_threads = (index_t)1 << (lg_chunk_size - 1);
+  index_t block_size = 1 << (radix - 1);
+  block_size = (num_threads <= block_size) ? num_threads : block_size;
+  index_t num_blocks = (num_threads + block_size - 1) / block_size;
+
+  assert(num_blocks == (unsigned int)num_blocks);
+
+  fr_t* d_radixX_twiddles = nullptr;
+  fr_t* d_intermediate_twiddles = nullptr;
+  unsigned int intermediate_twiddle_shift = 0;
+
+#define NTT_CONFIGURATION num_blocks, block_size, sizeof(fr_t) * block_size, stream
+#define NTT_ARGUMENTS                                                   \
+  radix, lg_domain_size, stage, iterations, chunk_id, d_inout, partial_twiddles,  \
+      radix7_twiddles + 64 + 128 + 256 + 512, d_radixX_twiddles,        \
+      d_intermediate_twiddles, intermediate_twiddle_shift, is_intt,     \
+      Domain_size_inverse + lg_domain_size
+
+  switch (radix) {
+    case 6:
+      if (stage == 0) {
+        _CT_NTT_without_rotate<0><<<NTT_CONFIGURATION>>>(NTT_ARGUMENTS);
+      } else if (stage == 6) {
+        intermediate_twiddle_shift = ::std::max(12 - lg_domain_size, 0);
+        d_intermediate_twiddles = radix_middles;
+        _CT_NTT_without_rotate<2><<<NTT_CONFIGURATION>>>(NTT_ARGUMENTS);
+      } else if (stage == 12) {
+        intermediate_twiddle_shift = ::std::max(18 - lg_domain_size, 0);
+        d_intermediate_twiddles = radix_middles + 64 * 64;
+        _CT_NTT_without_rotate<2><<<NTT_CONFIGURATION>>>(NTT_ARGUMENTS);
+      } else {
+        _CT_NTT_without_rotate<1><<<NTT_CONFIGURATION>>>(NTT_ARGUMENTS);
+      }
+      break;
+    case 7:
+      d_radixX_twiddles = radix7_twiddles;
+      if (stage == 0) {
+        _CT_NTT_without_rotate<0><<<NTT_CONFIGURATION>>>(NTT_ARGUMENTS);
+      } else if (stage == 7) {
+        intermediate_twiddle_shift = ::std::max(14 - lg_domain_size, 0);
+        d_intermediate_twiddles = radix_middles + 64 * 64 + 4096 * 64;
+        _CT_NTT_without_rotate<2><<<NTT_CONFIGURATION>>>(NTT_ARGUMENTS);
+      } else {
+        _CT_NTT_without_rotate<1><<<NTT_CONFIGURATION>>>(NTT_ARGUMENTS);
+      }
+      break;
+    case 8:
+      d_radixX_twiddles = radix7_twiddles + 64;
+      if (stage == 0) {
+        _CT_NTT_without_rotate<0><<<NTT_CONFIGURATION>>>(NTT_ARGUMENTS);
+      } else if (stage == 8) {
+        intermediate_twiddle_shift = ::std::max(16 - lg_domain_size, 0);
+        d_intermediate_twiddles = radix_middles + 64 * 64 + 4096 * 64 + 128 * 128;
+        _CT_NTT_without_rotate<2><<<NTT_CONFIGURATION>>>(NTT_ARGUMENTS);
+      } else {
+        _CT_NTT_without_rotate<1><<<NTT_CONFIGURATION>>>(NTT_ARGUMENTS);
+      }
+      break;
+    case 10:
+      d_radixX_twiddles = radix7_twiddles + 64 + 128 + 256;
+      if (stage == 0) {
+        _CT_NTT_without_rotate<0><<<NTT_CONFIGURATION>>>(NTT_ARGUMENTS);
+      } else {
+        _CT_NTT_without_rotate<1><<<NTT_CONFIGURATION>>>(NTT_ARGUMENTS);
+      }
+      break;
+    default:
+      assert(false);
+  }
+
+#undef NTT_CONFIGURATION
+#undef NTT_ARGUMENTS
+}
+
+template <typename fr_t>
 void CTkernel_lambda(
     int iterations,
     fr_t* d_in,
@@ -1004,4 +1109,3 @@ void CTkernel_lambda(
 }
 
 }
-

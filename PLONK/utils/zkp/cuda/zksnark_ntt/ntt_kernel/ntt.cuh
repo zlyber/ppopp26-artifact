@@ -640,6 +640,31 @@ void ntt_step3(fr_t* inout, fr_t* partial_twiddles, fr_t* radix_twiddles, fr_t* 
 }
 
 template <typename fr_t>
+void ntt_stage_no_rotate(fr_t* inout, fr_t* partial_twiddles, fr_t* radix_twiddles, fr_t* radix_middles,
+              fr_t* partial_group_gen_powers, fr_t* Domain_size_inverse, int lg_domain_size, int lg_chunk_size,
+              int iterations, int stage, int chunk_id, InputOutputOrder ntt_order, Direction ntt_direction,
+              cudaStream_t stream = (cudaStream_t)0)
+{
+  const bool intt = ntt_direction == Direction::inverse;
+
+  CTkernel_no_rotate(
+    iterations,
+    inout,
+    partial_twiddles,
+    radix_twiddles,
+    radix_middles,
+    partial_group_gen_powers,
+    Domain_size_inverse,
+    lg_domain_size,
+    lg_chunk_size,
+    intt,
+    stage,
+    chunk_id,
+    stream);
+  CUDA_CHECK(cudaGetLastError());
+}
+
+template <typename fr_t>
 void compute_ntt(
     size_t device_id,
     fr_t* inout,

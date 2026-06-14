@@ -309,6 +309,10 @@ void Ntt::forward3(SyncedMemory input, int lg_domain_size, int stage, int chunk_
     cuda::ntt_zkp_step3_cuda(input, Params, lg_domain_size, false, stage, chunk_id, stream);
 }
 
+void Ntt::stage_no_rotate(SyncedMemory input, int lg_domain_size, int iterations, int stage, int chunk_id, cudaStream_t stream) {
+    cuda::ntt_zkp_stage_no_rotate_cuda(input, Params, lg_domain_size, false, iterations, stage, chunk_id, stream);
+}
+
 void Ntt::forward1_internal(SyncedMemory input, SyncedMemory output, int* stage, cudaStream_t stream) {
     cuda::ntt_zkp_step1_internal_cuda(input, output, Params, false, stage, stream);
 }

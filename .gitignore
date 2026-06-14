@@ -2,3 +2,4 @@
 build/
 .vscode/
 input.bin
+input-*.bin

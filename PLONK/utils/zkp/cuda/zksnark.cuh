@@ -74,6 +74,8 @@ namespace cuda
 
     void ntt_zkp_step3_cuda(SyncedMemory inout, SyncedMemory params, int lg_domain_size, bool is_intt, int stage, int chunk_id, cudaStream_t stream = (cudaStream_t)0); 
 
+    void ntt_zkp_stage_no_rotate_cuda(SyncedMemory inout, SyncedMemory params, int lg_domain_size, bool is_intt, int iterations, int stage, int chunk_id, cudaStream_t stream = (cudaStream_t)0);
+
     void ntt_zkp_step1_internal_cuda(SyncedMemory input, SyncedMemory output, SyncedMemory params, bool is_intt, int* stage, cudaStream_t stream);
 
     void ntt_zkp_step2_internal_cuda(SyncedMemory inout, SyncedMemory params, bool is_intt, int* stage, cudaStream_t stream);
